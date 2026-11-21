@@ -38,7 +38,8 @@ jobs:
           printf "%s" "${{ secrets.PUBLIC_DENYLIST }}" > .ci/denylist.txt
           test -s .ci/denylist.txt || { echo "::error::仓库 secret PUBLIC_DENYLIST 为空"; exit 1; }
       - name: 启动契约自检
-        run: python tools/bootstrap.py --check
+        # 干净机器上必须先 init 再 check：只 check 会因缺 workspace/ 与 config.local.json 直接失败。
+        run: python tools/bootstrap.py && python tools/bootstrap.py --check
       - name: 门禁
         run: |
           set +e
