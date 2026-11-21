@@ -293,13 +293,22 @@ def main():
     row("2 版本一致", "VERSION " + (ver or "?") + " / latest " + (lver or "?") + " / 最新 tag " + (last_tag or "无"), GREEN if v_ok else RED)
 
     # 3 标记类型与指向
+    # annotated 是硬要求（轻量标签能被悄悄挪走，不留时间不留人）。
+    # 指向分两种场合：tag 触发时必须是这一次；master 推送时只要求它是 HEAD 的祖先——
+    # 发版之后再有提交是常态，不能因此把 master 的每次推送都判红。
     if last_tag:
         _, ttype = repo.ok(["cat-file", "-t", last_tag])
         _, tcommit = repo.ok(["rev-parse", last_tag + "^{commit}"])
         annotated = ttype.strip() == "tag"
         points_head = tcommit.strip() == repo.ok(["rev-parse", "HEAD"])[1].strip()
-        detail = ttype.strip() + " / 指向 " + tcommit[:7] + (" = HEAD" if points_head else " ≠ HEAD")
-        row("3 标记", detail, GREEN if (annotated and points_head) else RED)
+        if a.expect_tag:
+            ok = annotated and points_head
+            detail = ttype.strip() + " / 指向 " + tcommit[:7] + (" = HEAD" if points_head else " ≠ HEAD")
+        else:
+            anc = repo.run(["merge-base", "--is-ancestor", tcommit.strip(), "HEAD"])[0] == 0
+            ok = annotated and anc
+            detail = ttype.strip() + " / 指向 " + tcommit[:7] + (" = HEAD" if points_head else "（是 HEAD 的祖先）" if anc else "（既不是 HEAD 也不是它的祖先）")
+        row("3 标记", detail, GREEN if ok else RED)
     else:
         row("3 标记", "没有任何 tag", YELLOW)
 

@@ -62,11 +62,7 @@ README.md
 SECURITY.md
 VERSION
 config.example.json
-docs/internal/README.md
-docs/internal/开源审计_20261117.md
-docs/internal/待脱敏清单.md
 docs/maintain/维护方法.md
-docs/为什么值得信.md
 gate/_e0.py
 gate/_gate.py
 gate/_ignore.py

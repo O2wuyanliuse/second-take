@@ -18,3 +18,9 @@ CHANGELOG.md→packaging/public_denylist.txt = v2.5 已删；这里记 0.5.0 当
 CHANGELOG.md→packaging/leak_known_history.txt = v2.5 已删；这里记 0.5.0 当时的做法
 docs/maintain/维护方法.md→packaging/public_denylist.txt = v2.5 已删；只在 §9 历史条目里被引用
 docs/maintain/维护方法.md→packaging/leak_known_history.txt = v2.5 已删；只在 §9 历史条目里被引用
+
+# 2026-11-21 v3.6：公开面收敛，考古层与病史移出仓库（内容存私库）。
+# 下面几条是**历史条目里记的当时路径**，文件已删，断链是事实不是错。
+CHANGELOG.md→docs/为什么值得信.md = v3.6 已移出仓库
+docs/maintain/维护方法.md→docs/internal/开源审计_20261117.md = v3.6 已移出仓库
+docs/maintain/维护方法.md→docs/internal/README.md = v3.6 已移出仓库

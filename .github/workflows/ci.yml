@@ -77,6 +77,12 @@ jobs:
       - name: ⑥ 维护方法双写
         shell: bash
         run: |
+          # tag 推送不产生「改了代码却没改维护方法」这回事：此时 github.event.before 是
+          # **上一个 tag 对象**（不是提交），按提交段比较必然判错——那是假红，跳过并说明。
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "tag 推送：跳过双写检查（没有提交段可比）"
+            exit 0
+          fi
           BASE="${{ github.event.before }}"
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
             echo "首次推送，没有可比基准——本步不判。"

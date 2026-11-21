@@ -31,6 +31,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # checkout 在 tag 推送时按 github.sha（已 peel 的提交）取对象，本地 refs/tags/<tag>
+      # 会成一条指向 commit 的轻量引用；判据要读「真 tag 对象」，所以在判据之前补一次。
+      - name: 补齐 tag 对象（只在 tag 触发时）
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: git fetch --tags --force --no-recurse-submodules
       - name: 词表从 secret 注入（不进仓库）
         shell: bash
         run: |
