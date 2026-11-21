@@ -40,7 +40,7 @@ def find_git(explicit=None):
         return w
     for c in (
         "C:/Program Files/Git/cmd/git.exe",
-        "C:/Program Files/Git/cmd/git.exe",
+        "C:/Program Files (x86)/Git/cmd/git.exe",
     ):
         if Path(c).exists():
             return c
