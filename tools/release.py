@@ -325,11 +325,14 @@ def main(argv=None):
 
     print("\n✓ 三处已同源：VERSION%s / latest.json / tag v%s"
           % ("（如存在）" if VERSION_FILE.exists() else "（本库无此文件）", args.version))
-    print("下一步（手工）：")
-    print("  1) 打包：python packaging/_pack.py → 得到 second-take-%s-win.zip" % args.version)
-    print("  2) 在 GitHub 建 release v%s，上传 zip，正文粘 CHANGELOG 那一节" % args.version)
-    print("  3) 核对 latest.json 的 pack_urls 与新上传的资产 URL 一字不差")
-    print("  4) 推 tag：git push origin master --tags")
+    print("下一步（手工，顺序别换）：")
+    print("  0) 判据：python tools/verify_release.py --words <词表> --no-zip")
+    print("  1) 打包：python tools/build_public_package.py --out dist/second-take-%s-win.zip --words <词表>" % args.version)
+    print("     封条：python tools/seal.py seal dist/second-take-%s-win.zip --words <词表>" % args.version)
+    print("  2) 判据全量：python tools/verify_release.py --words <词表> --zip dist/second-take-%s-win.zip" % args.version)
+    print("  3) 推 tag：git push origin v%s" % args.version)
+    print("  4) 建 release：网页选已存在的 tag，资产名一字不差，正文粘 CHANGELOG 那一节")
+    print("  5) 最后推 master：git push origin master")
     return 0
 
 
