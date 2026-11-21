@@ -1,7 +1,8 @@
 name: ci
 
-# 跑六件（2026-11-21 加 ②⑥）：ruff → 启动自检 → 门禁 → 链接 → 脱敏 → 维护方法双写。
-# 不装依赖、不跑测试（本仓库没有用例——用例属于各项目自己的 `_selftest`）。
+# 跑七件：ruff → 启动自检 → 门禁 → 链接 → 脱敏 → 维护方法双写 → 用例。
+# 不装项目依赖；只装 ruff 与 pytest 两个工具。用例在 `tests/`，测的是**本库自己的检查器**，
+# 不读任何项目文件——所以它能在干净机器上跑，也不会因为某个项目改名而红。
 # 目的不是「证明代码完美」，是**别人 clone 下来之前，先有人替他跑一遍**.
 
 on:
@@ -22,8 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: 装 ruff
-        run: python -m pip install --quiet ruff
+      - name: 装 ruff 与 pytest
+        run: python -m pip install --quiet ruff pytest
       - name: ① ruff（只开真错：F + E9）
         run: python -m ruff check .
       # CI 就是一台干净机器——正好让它自证「clone 下来能不能自己长出来」。
@@ -62,3 +63,7 @@ jobs:
             exit 0
           fi
           python tools/check_maintenance.py --base "$BASE"
+      # ⑦ 用例测的是「检查器还有没有牙」：无词表给不给绿、断链报不报、双写会不会被
+      #    下一条提交的免责标签顶掉。改判据的人先在这里红，别等发布那天红。
+      - name: ⑦ 用例（30 条，测本库的检查器）
+        run: python -m pytest -q

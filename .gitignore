@@ -43,3 +43,6 @@ desktop.ini
 # 用户材料与本地配置：不进仓库
 workspace/
 config.local.json
+
+# pytest 缓存（用例在 tests/，缓存不进库）
+.pytest_cache/
