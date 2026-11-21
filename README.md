@@ -1,5 +1,7 @@
 # second-take
 
+> **English (short):** a method layer that turns a long story into shootable shots and reproducible prompts — criteria and gates, not a prompt collection. Python 3.11+, runs locally, no telemetry, no network calls of its own. Start with `python tools/bootstrap.py --check`. → [English README](README.en.md)｜Code Apache-2.0 ／ docs CC BY-SA 4.0.
+
 把一部长篇拆成能拍的镜头，再把每个镜头写成能复现的提示词。每一步都有判据，出问题能看出停在哪。
 
 > 拍片时 `Take 2` 是「再来一条」；日常英语里 `my take` 是「我的看法」。这个名字说的是它真正在做的事：**不断重生成，直到对为止**。

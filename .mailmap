@@ -1,0 +1,9 @@
+# .mailmap —— 同一个人的多个提交身份并成一个（`git shortlog -sne` 看得出来）
+#
+# 只按邮箱匹配，**故意不写另一个显示名**：那个名字是私项目的名字，
+# 写进公库等于把它带出去一次。邮箱本身在 docs/ 的审计记录里已作为「本地伪域」出现过。
+#
+# 加这一条是因为：旧库归档分支里的提交用的是下面这个本地伪域身份。
+# 那个分支不推公库（见 docs/internal/开源审计_20261117.md），但一旦有人推错，
+# shortlog 至少还认得出是同一个人。
+O2wuyanliuse <O2wuyanliuse@users.noreply.github.com> <author@fansing.local>
