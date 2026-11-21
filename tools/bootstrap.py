@@ -213,7 +213,12 @@ def run_init(root):
             say(out or "(门禁无输出)")
             if r.returncode != 0:
                 m = re.search(r"阻断\s*(\d+)", out)
-                gate_bad = m.group(1) if m else "若干"
+                n = m.group(1) if m else ""
+                # 门禁退出码 2 是「提示档」，此时阻断数是 0——那一行不该出现。
+                if n and n != "0":
+                    gate_bad = n
+                elif r.returncode == 1 and not n:
+                    gate_bad = "若干"
         except Exception as e:
             say("[注意] 门禁没跑起来 (%s), 跳过。" % e)
     else:
