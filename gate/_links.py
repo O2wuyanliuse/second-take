@@ -32,7 +32,9 @@ md 里用反引号包住、**同时满足下面四条**的才算候选：
 退出码：`0` 干净 ／ `1` 有断链 ／ `2` 文件都找不到（没查成，不算通过）
 """
 
+import fnmatch
 import io
+import json
 import os
 import re
 import sys
@@ -66,9 +68,34 @@ SKIP_REF = ("packaging/templates/",)
 SKIP_DIRS = ignored_dirs()
 # 文件里出现这几个词，视为「已声明含项目实例」，命中降级为提示
 DECLARED = ("项目实例", "带走后不存在")
+# 按**路径**声明「这属于项目实例」：骨架包不带、用户自建，存在与否都不判断链。
+# 只在 `links_scope.json` 里改，不许为了消红改这个脚本（见维护方法 §9 v3.9）。
+SCOPE_FILE = os.path.join(ROOT, "links_scope.json")
 
 CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
 
+
+
+def load_scope():
+    """读 `links_scope.json`：哪些路径属于「项目实例」——骨架包不带、用户自建。
+
+    它们存在与否都不判断链，只降级为提示。判据没放宽：承认的是「这棵树本来就不带项目实例」这个事实。
+    """
+    try:
+        with io.open(SCOPE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return (), ()
+    dirs = tuple(x for x in (data.get("instance_dirs") or []) if x)
+    pats = tuple(x for x in (data.get("instance_files") or []) if x)
+    return dirs, pats
+
+
+def in_scope(c, dirs, pats):
+    c = c.replace("\\", "/")
+    if any(c.startswith(d) for d in dirs):
+        return True
+    return any(fnmatch.fnmatch(c, p) for p in pats)
 
 
 def load_allow():
@@ -195,7 +222,8 @@ def main():
         return 2
 
     allow, noreason = load_allow()
-    hard, soft, checked, pardoned = [], [], 0, 0
+    scope_dirs, scope_pats = load_scope()
+    hard, soft, checked, pardoned, scoped = [], [], 0, 0, 0
     for fp in files:
         rel = os.path.relpath(fp, ROOT).replace("\\", "/")
         if rel.startswith(SKIP_REF):
@@ -215,6 +243,10 @@ def main():
             if (rel, c) in allow:
                 pardoned += 1
                 continue
+            if in_scope(c, scope_dirs, scope_pats):
+                scoped += 1
+                soft.append((rel, c))
+                continue
             (soft if declared else hard).append((rel, c))
 
     bhard, bsoft, bchecked = scan_brackets(files, allow)
@@ -233,6 +265,8 @@ def main():
         print("[links] ⚠️ `links_allow.txt` 里这几行没写理由，不算豁免：%s" % "、".join(noreason))
     if soft:
         print("[links] 其中 %d 处落在「已声明含项目实例」的文件里，降级为提示" % len(soft))
+    if scoped:
+        print("[links] 其中 %d 处属于「项目实例」（links_scope.json），降级为提示" % scoped)
     if bsoft:
         print("[links] 类别名：%d 处落在「已声明含项目实例」的文件里，降级为提示" % len(bsoft))
     if bhard:
