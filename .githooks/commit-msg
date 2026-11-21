@@ -1,0 +1,7 @@
+#!/bin/sh
+# 提交信息检查：改了流程相关目录（gate/／packaging/／tools/／.github/）
+# 却没同步改 docs/maintain/维护方法.md 时，必须在信息里写：
+#     [no-procedure-change: 说明为什么这次改了代码但流程没变]
+#
+# 装法：git config core.hooksPath .githooks（与 pre-commit / pre-push 同一处）
+python tools/check_maintenance.py --staged --message-file "$1"

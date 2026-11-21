@@ -1,0 +1,28 @@
+# 统一换行：仓库内与检出后一律 LF，避免 Windows/macOS 来回洗
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.json  text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# 明确二进制，别让 git 试图转
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.psd   binary
+*.mp4   binary
+*.mov   binary
+*.zip   binary
+
+# ── 不进发行包（git archive 的 export-ignore，发版时自动排除）──
+# 为什么用这里而不是 `packaging/_pack.py` 的清单：发版走的是 `git archive HEAD`，
+# 它只认 export-ignore，**不读任何脚本里的排除清单**。0.4.0 的包实测带了这两份
+# （各 19KB／16KB），就是清单写了但没生效——「文档说要，机器不查」的第五次。
+Agent框架/13_外部环节接入契约_v0.1.md export-ignore
+Agent框架/同步防断_v1.md export-ignore

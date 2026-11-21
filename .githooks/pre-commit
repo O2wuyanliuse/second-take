@@ -1,0 +1,29 @@
+#!/bin/sh
+# 提交前：与 CI 同口径的三件（ruff 要装，本地不一定有，跳过）
+#
+# 装法：git config core.hooksPath .githooks
+# 绕法：git commit --no-verify —— 所以 CI 里还有一层，缺一层就只防君子。
+#
+# ⚠ 本库退出码约定：0 绿 ／ 1 阻断 ／ **2 提示**。`set -e` 会把 2 也当失败，
+#   于是「门禁提示档」会把每次提交都拦下来——那样第三次就有人 `--no-verify` 了。
+#   所以这里显式放过 2。
+
+run() {
+    "$@"; rc=$?
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+        echo "[pre-commit] 退出码 $rc —— 阻断，停。修完再来，别 --no-verify。" >&2
+        exit "$rc"
+    fi
+    if [ "$rc" -eq 2 ]; then
+        echo "[pre-commit] （退出码 2＝提示档，不是红）"
+    fi
+    return 0
+}
+
+echo "[pre-commit] 门禁 …"
+run python gate/_gate.py
+echo "[pre-commit] 断链 …"
+run python gate/_links.py
+echo "[pre-commit] 脱敏（公库禁用词，只看当前树）…"
+run python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
+echo "[pre-commit] 通过。"

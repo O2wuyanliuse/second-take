@@ -1,0 +1,34 @@
+{
+  "_说明": "复制成同目录 checks.config.json 再改。不写这一份，两个脚本用内置通用缺省（扫全库、不跳项目目录）。",
+
+  "root": "..",
+  "scan_exts": [".md", ".py", ".json", ".txt", ".html"],
+  "skip_dirs": [".git", "__pycache__", "node_modules", ".venv", ".<宿主缓存目录>"],
+
+  "links": {
+    "_管什么": "路径引用检查：文档里写下的路径，盘上还在不在",
+    "skip_ref": [],
+    "_skip_ref 说明": "哪些子目录里的路径是「目标状态」而不是本仓库路径，列在这里",
+    "declared_phrases": ["项目实例", "带走后不存在"],
+    "allow_file": null,
+    "_allow_file 说明": "豁免清单写法：一个相对本项目的路径（比如 `gate/links_allow.txt`），每行「路径 = 理由」，**没有理由的行不算**。留 null ＝ 在同目录找 links_allow.txt"
+  },
+
+  "diff": {
+    "_管什么": "账实核对：原件／定稿稿／变更记录三件套逐行 diff，查「改了的是不是都记了」",
+    "text_dir": "",
+    "_text_dir 说明": "正文所在目录（相对项目根）；正文散在别处时改这里",
+    "volumes": [],
+    "_volumes 说明": "每卷一条：name／raw（原件）／final（定稿稿）／log（变更记录），路径都相对 text_dir。空数组＝这一项跳过，不报假绿"
+  },
+
+  "orphan": {
+    "_管什么": "孤儿件检查：谁都没提过的文件",
+    "skip_dirs": [],
+    "_skip_dirs 说明": "归档区、备份区放这里——那里的件「没人引用」是正常的",
+    "skip_as_target": ["README.md"],
+    "_skip_as_target 说明": "入口件不作为被检查对象，但必须作为引用源参与扫描",
+    "index_names": ["_index.md"],
+    "py_skip": ["attic", "__pycache__", ".<宿主缓存目录>"]
+  }
+}

@@ -1,0 +1,41 @@
+name: ci
+
+# 跑六件（2026-11-21 加 ②⑥）：ruff → 启动自检 → 门禁 → 链接 → 脱敏 → 维护方法双写。
+# 不装依赖、不跑测试（本仓库没有用例——用例属于各项目自己的 `_selftest`）。
+# 目的不是「证明代码完美」，是**别人 clone 下来之前，先有人替他跑一遍**.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 双写检查要 diff「相对 master 改了哪些文件」，浅克隆拿不到基准
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 装 ruff
+        run: python -m pip install --quiet ruff
+      - name: ① ruff（只开真错：F + E9）
+        run: python -m ruff check .
+      # CI 就是一台干净机器——正好让它自证「clone 下来能不能自己长出来」。
+      # 先幂等 init（缺目录就建），再 check（退出 0 才算合格）。
+      - name: ② 启动自检（干净机器：先建再验）
+        run: python tools/bootstrap.py && python tools/bootstrap.py --check
+      - name: ③ 门禁（骨架库只覆盖 3/19，跳过不算绿）
+        run: python gate/_gate.py
+      - name: ④ 断链（文档里写的路径真的存在）
+        run: python gate/_links.py
+      # ⑤ 用公库自带的禁用词表，**不借私库词表**——那正是它能进 CI 的原因。
+      #    `--no-history`：CI 只看当前树。历史是全量 blob 扫描，属发布前动作
+      #    （`--deny ... --strict` 在本地跑），也免得每次 push 都扫 90 个提交。
+      - name: ⑤ 脱敏（公库自带禁用词，只看当前树）
+        run: python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
+      # ⑥ 改了流程相关目录就必须同步改维护方法，否则提交信息要带 [no-procedure-change: 理由]
+      - name: ⑥ 维护方法双写
+        run: python tools/check_maintenance.py --base origin/master

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>表格视图模板 · 审校版</title>
+<!--
+════════════════════════════════════════════════════════════════════
+  结构化交付物视觉模板（审校版）
+  table-view-template.html
+
+  用途：凡是「表」类交付物——总览表、设定对照表、设计表、时间轴、
+        分镜表、矩阵、流程图——都从这里复制，不要自己在对话里贴 markdown。
+
+  用法：
+    1. 整份复制，改 <title>、header、各 section 的内容。
+    2. CSS 一律不动。——你要的是「同一套语言」，不是「每次重新设计」。
+    3. 不要的区块整段删掉，不要留空壳。
+
+  ⚠ 这套是暗色版本，服务于 IDE / 预览面板。
+    如果要交给外部读者（浅色环境），只改下面 :root 里的 7 个基础色，
+    结构、间距、标记规则全部不动。
+
+  标记规则（三档，只能三档）：
+    暗红 .a  = 必补  —— 内容整块缺失，或会误导
+    琥珀 .b  = 建议改 —— 表述会被读错
+    灰   .c  = 细节  —— 措辞与格式
+
+  铁律：每一处标注后面都必须跟一句「问题是什么 + 建议怎么改」。
+        只涂颜色不给建议，等于把问题原样丢回给作者。
+════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#0d0f13;
+    --panel:#161a21;
+    --panel-2:#1b202a;
+    --line:#262c37;
+    --line-2:#333b49;
+    --txt:#d9dde5;
+    --txt-dim:#98a1b0;
+    --txt-faint:#6b7482;
+    --accent:#7aa2f7;
+
+    --p1-bg:#2a1713;   --p1-line:#e2704f;   --p1-txt:#ffb49a;
+    --p2-bg:#241d10;   --p2-line:#c9973f;   --p2-txt:#f0c880;
+    --p3-bg:#191d24;   --p3-line:#5a6678;   --p3-txt:#a9b4c4;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--txt);
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 28px 96px}
+
+  header{margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 10px;font-size:26px;font-weight:600;letter-spacing:.02em}
+  h1 .ver{
+    font-size:12px;font-weight:500;color:var(--txt-faint);
+    border:1px solid var(--line-2);border-radius:4px;
+    padding:2px 7px;vertical-align:middle;margin-left:8px;letter-spacing:.05em;
+  }
+  .meta{margin:0;color:var(--txt-dim);font-size:13px}
+  .meta b{color:var(--txt);font-weight:500}
+
+  .legend{
+    display:flex;flex-wrap:wrap;gap:18px;
+    margin-top:18px;padding:14px 16px;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    font-size:12.5px;color:var(--txt-dim);
+  }
+  .legend .k{display:flex;align-items:center;gap:7px}
+  .swatch{width:14px;height:14px;border-radius:3px;border-left:3px solid}
+  .sw1{background:var(--p1-bg);border-color:var(--p1-line)}
+  .sw2{background:var(--p2-bg);border-color:var(--p2-line)}
+  .sw3{background:var(--p3-bg);border-color:var(--p3-line)}
+
+  .idx{
+    margin:26px 0 38px;padding:18px 20px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  }
+  .idx h2{margin:0 0 14px;font-size:13px;font-weight:600;letter-spacing:.08em;color:var(--txt-dim);text-transform:uppercase}
+  .idx h2 em{font-style:normal;color:var(--txt);margin-right:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 10px;border-radius:5px;font-size:12.5px;text-decoration:none;
+    line-height:1.4;border:1px solid;border-left-width:3px;transition:filter .15s;
+  }
+  .chip:hover{filter:brightness(1.35)}
+  .chip .id{font-weight:600;font-size:11.5px;letter-spacing:.06em;opacity:.9}
+  .chip.a{border-color:var(--p1-line);background:var(--p1-bg);color:var(--p1-txt)}
+  .chip.b{border-color:var(--p2-line);background:var(--p2-bg);color:var(--p2-txt)}
+  .chip.c{border-color:var(--p3-line);background:var(--p3-bg);color:var(--p3-txt)}
+
+  section{margin:0 0 44px;scroll-margin-top:24px}
+  h2.sec{
+    margin:0 0 16px;font-size:17px;font-weight:600;letter-spacing:.02em;
+    padding-bottom:9px;border-bottom:1px solid var(--line);
+  }
+  h2.sec .n{color:var(--accent);margin-right:9px;font-weight:500}
+  h3.sub{margin:26px 0 10px;font-size:13px;font-weight:600;color:var(--txt-dim);letter-spacing:.04em}
+  h3.sub:first-of-type{margin-top:0}
+
+  table{
+    width:100%;border-collapse:separate;border-spacing:0;
+    margin:0 0 4px;font-size:13.2px;line-height:1.7;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  }
+  th{
+    text-align:left;font-weight:600;font-size:12px;letter-spacing:.05em;
+    color:var(--txt-dim);background:var(--panel-2);
+    padding:10px 14px;border-bottom:1px solid var(--line-2);white-space:nowrap;
+  }
+  td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--txt);font-weight:500;white-space:nowrap}
+  td.n{color:var(--txt-faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+  tbody tr:hover td{background:rgba(122,162,247,.035)}
+
+  .f{position:relative;border-left:3px solid;padding-left:13px!important}
+  .f.a{background:var(--p1-bg);border-left-color:var(--p1-line);color:var(--p1-txt)}
+  .f.b{background:var(--p2-bg);border-left-color:var(--p2-line);color:var(--p2-txt)}
+  .f.c{background:var(--p3-bg);border-left-color:var(--p3-line);color:var(--p3-txt)}
+  .f .tag{
+    display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+    padding:1px 5px;border-radius:3px;margin-right:7px;vertical-align:1px;
+    border:1px solid currentColor;opacity:.85;font-variant-numeric:tabular-nums;
+  }
+  .f .why{display:block;margin-top:7px;font-size:12px;line-height:1.65;opacity:.82}
+  .f .why::before{content:"→ ";opacity:.6}
+
+  .gap{margin:20px 0;padding:20px 22px;border-radius:8px;background:var(--p1-bg);border:1px dashed var(--p1-line)}
+  .gap .hd{display:flex;align-items:center;gap:9px;margin-bottom:9px;font-size:14.5px;font-weight:600;color:var(--p1-txt)}
+  .gap .hd .tag{font-size:10.5px;font-weight:700;letter-spacing:.08em;padding:2px 6px;border-radius:3px;border:1px solid currentColor}
+  .gap p{margin:0 0 7px;font-size:12.8px;line-height:1.7;color:var(--p1-txt);opacity:.9}
+  .gap p:last-child{margin-bottom:0}
+  .gap p b{color:#ffd2c2}
+
+  .note{
+    margin:14px 0 0;padding:12px 15px;
+    background:var(--panel-2);border-left:2px solid var(--line-2);
+    border-radius:0 6px 6px 0;font-size:12.6px;color:var(--txt-dim);line-height:1.7;
+  }
+  .note b{color:var(--txt)}
+  .note.warn{border-left-color:var(--p2-line);background:var(--p2-bg);color:var(--p2-txt)}
+  .note.warn b{color:var(--p2-txt)}
+
+  blockquote{
+    margin:12px 0;padding:12px 16px;
+    border-left:2px solid var(--accent);background:rgba(122,162,247,.06);
+    border-radius:0 6px 6px 0;font-size:13px;color:#b9c8ec;
+  }
+
+  footer{
+    margin-top:56px;padding-top:22px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--txt-faint);line-height:1.8;
+  }
+  footer b{color:var(--txt-dim)}
+
+  @media (max-width:720px){
+    .wrap{padding:24px 16px 64px}
+    h1{font-size:20px}
+    table{font-size:12.5px}
+    td,th{padding:9px 11px}
+    td.k{white-space:normal}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>〔文档标题〕<span class="ver">v1.0 · 审校视图</span></h1>
+  <p class="meta"><b>〔一句话定位这张表是什么、不替代什么〕</b>　·　 建立 〔YYYY-MM-DD〕</p>
+
+  <div class="legend">
+    <span class="k"><i class="swatch sw1"></i> 必补——内容整块缺失或会误导</span>
+    <span class="k"><i class="swatch sw2"></i> 建议改——表述会被读错</span>
+    <span class="k"><i class="swatch sw3"></i> 细节——措辞与格式</span>
+  </div>
+</header>
+
+<!-- ▼ 疑点索引：只有一条疑点也放，不要省 ▼ -->
+<div class="idx">
+  <h2><em>待确认疑点</em>〔N〕处 · 点击跳转</h2>
+  <div class="chips">
+    <a class="chip a" href="#A1"><span class="id">A1</span>〔一句话概括〕</a>
+    <a class="chip b" href="#B1"><span class="id">B1</span>〔一句话概括〕</a>
+    <a class="chip c" href="#C1"><span class="id">C1</span>〔一句话概括〕</a>
+  </div>
+</div>
+
+<main>
+
+<section>
+  <h2 class="sec"><span class="n">一</span>〔节标题〕</h2>
+  <table>
+    <thead><tr><th style="width:130px">〔列〕</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td class="k">〔键〕</td><td>〔干净的结论。每格必须能单独读懂——不看源文件也明白。宁可长，不许省。〕</td></tr>
+      <tr><td class="k">〔键〕</td><td>〔同上〕</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ▼ 带疑点的格子：色块 + 左侧竖线 + 编号 + why ▼ -->
+  <table style="margin-top:14px">
+    <thead><tr><th style="width:130px">〔列〕</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="k">〔键〕</td>
+        <td class="f b" id="B1"><span class="tag">B1</span>〔原有内容保持原样，不要为了标注去改它。〕
+          <span class="why">〔问题是什么。要具体到读者会怎么误解。〕<b>〔建议怎么改——必须给，不能只描述问题。〕</b></span>
+        </td>
+      </tr>
+      <tr>
+        <td class="k">〔键〕</td>
+        <td class="f c" id="C1"><span class="tag">C1</span>〔原有内容〕
+          <span class="why">〔措辞／格式层面的问题。〕</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2 class="sec"><span class="n">二</span>〔节标题〕</h2>
+
+  <h3 class="sub">〔子节标题〕</h3>
+  <table>
+    <thead><tr><th style="width:100px">〔列〕</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td class="k">〔键〕</td><td>〔内容〕</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ▼ 整块缺失：用虚线框占位，别悄悄省略 ▼ -->
+  <div class="gap" id="A1">
+    <div class="hd"><span class="tag">A1</span>缺失：〔缺的是什么〕</div>
+    <p><b>〔为什么这块不能没有——一句话说到痛处。〕</b></p>
+    <p>〔已经能确定的碎片，先摆出来，别让它也跟着丢掉。〕</p>
+    <p>〔建议补成什么样。〕</p>
+  </div>
+
+  <!-- ▼ 普通注 -->
+  <div class="note"><b>〔注的标题〕</b>　〔注的内容〕</div>
+
+  <!-- ▼ 带警示的注 -->
+  <div class="note warn"><b>〔编号〕</b>　〔这条注在说什么问题，以及建议。〕</div>
+
+  <!-- ▼ 引文 -->
+  <blockquote>〔需要原样保留的一段话。〕</blockquote>
+</section>
+
+</main>
+
+<footer>
+  <b>〔文件名 · 日期〕</b><br>
+  正常格内的文字 = 已定稿内容。<br>
+  带色块 + 左侧竖线的格子 = 疑点，色块里的 <b>→</b> 后面是问题说明与建议改法。<br>
+  虚线框 = 整块缺失，需要新写。<br>
+  <span style="opacity:.75">本视图只用于审校，不是交付版本。逐条拍板后改正式文件，再重新出一份干净的视图。</span>
+</footer>
+
+</div>
+</body>
+</html>

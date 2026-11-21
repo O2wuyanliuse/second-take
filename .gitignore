@@ -1,0 +1,45 @@
+# 素材类：本仓库只装方法，不装成品
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.psd
+*.psb
+*.zip
+*.rar
+*.7z
+
+# 项目专属目录：这两个目录一旦出现在本仓库，说明拷错了地方
+00_原著/
+99_过程稿/
+outputs/
+_沙盒_*/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 环境与本地配置
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.git-rewrite/
+
+# 用户材料与本地配置：不进仓库
+workspace/
+config.local.json

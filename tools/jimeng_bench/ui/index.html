@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>即梦出图工作台 · 甲档</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1b1e24; --panel2:#21252d; --panel3:#272c35; --line:#2c313a;
+    --fg:#dfe3ea; --fg2:#98a0ad; --fg3:#6b7480;
+    --accent:#4a9eff; --warn:#e0a33e; --bad:#e05c5c; --ok:#4fbf7f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:9px 18px;
+         border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:30}
+  header h1{font-size:13px;font-weight:600;margin:0;letter-spacing:.5px;color:var(--fg)}
+  .tag{font-size:11px;color:var(--fg2);border:1px solid var(--line);
+       border-radius:4px;padding:1px 7px;white-space:nowrap}
+  .tag.ok{color:var(--ok);border-color:#2c4a38}
+  .tag.bad{color:var(--bad);border-color:#4a2c2c}
+  main{display:grid;grid-template-columns:360px 1fr;gap:14px;padding:14px 18px 96px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .card h2{font-size:11px;font-weight:600;color:var(--fg3);margin:0 0 10px;
+           letter-spacing:1.2px;text-transform:uppercase}
+  label{display:block;font-size:11px;color:var(--fg3);margin:14px 0 6px;letter-spacing:.3px}
+  label:first-of-type{margin-top:0}
+  select,input,textarea{width:100%;background:var(--panel2);color:var(--fg);
+    border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;font-size:13px}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  textarea{resize:vertical;min-height:300px;line-height:1.7;font-size:13px;font-family:inherit}
+
+  /* 模型：自定义下拉，每档带一句描述 */
+  .msel{position:relative}
+  .mbtn{width:100%;display:flex;align-items:center;gap:7px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;
+    color:var(--fg);font:inherit;font-size:13px;text-align:left}
+  .mbtn:hover{border-color:var(--accent)}
+  .mbtn .car{margin-left:auto;color:var(--fg3);font-size:10px}
+  .mtag{font-size:10px;padding:0 5px;border-radius:3px;border:1px solid var(--line);color:var(--fg3)}
+  .mtag.on{color:#8fce9f;border-color:#2c4a38;background:#16241b}
+  .mtag.off{color:#c9a86b;border-color:#4a3a1a}
+  .mpop{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel3);
+    border:1px solid var(--line);border-radius:8px;padding:4px;z-index:40;
+    box-shadow:0 10px 28px #0009;display:none;max-height:320px;overflow:auto}
+  .mpop.open{display:block}
+  .mitem{padding:7px 9px;border-radius:5px;cursor:pointer}
+  .mitem:hover{background:#2f3542}
+  .mitem.on{background:#1e3a58}
+  .mtop{display:flex;align-items:center;gap:6px;font-size:13px}
+  .mtop b{font-weight:600}
+  .mdesc{font-size:11px;color:var(--fg3);margin-top:1px;line-height:1.4}
+
+  /* 比例：10 个方块平铺，形状自身示意宽高比 */
+  .ratios{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .rt{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+      padding:7px 2px 5px;cursor:pointer;text-align:center;user-select:none}
+  .rt:hover{border-color:#456}
+  .rt.on{background:#1e3a58;border-color:var(--accent)}
+  .rt .rg{height:26px;display:flex;align-items:center;justify-content:center}
+  .rt .rb{border:1.5px solid var(--fg3);border-radius:1px}
+  .rt.on .rb{border-color:#8fc3ff}
+  .rt span{display:block;font-size:10px;color:var(--fg3);margin-top:1px;letter-spacing:-.2px}
+  .rt.on span{color:#cfe6ff}
+
+  /* 尺寸：宽 高 + 锁链 */
+  .dim{display:flex;align-items:center;gap:6px}
+  .dim input{text-align:center}
+  .lock{width:30px;height:32px;flex:0 0 30px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:6px;color:var(--fg3);cursor:pointer;font-size:13px;line-height:1}
+  .lock.on{color:var(--accent);border-color:#2f4a6b;background:#182436}
+
+  /* 分段按钮组：分辨率 / 数量 */
+  .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .seg button{flex:1;background:var(--panel2);border:none;border-right:1px solid var(--line);
+    color:var(--fg2);padding:7px 0;font:inherit;font-size:12px;cursor:pointer}
+  .seg button:last-child{border-right:none}
+  .seg button:hover{color:var(--fg);background:#252a33}
+  .seg button.on{background:#1e3a58;color:#cfe6ff}
+
+  .meta{display:flex;justify-content:space-between;font-size:11px;color:var(--fg3);margin-top:6px}
+  .hint{font-size:11px;color:var(--fg3);margin-top:5px}
+  .warnbox{background:#2a2213;border:1px solid #4a3a1a;color:#e8c67a;
+    border-radius:6px;padding:9px 11px;font-size:12px;margin-top:10px;line-height:1.6}
+  .errbox{background:#2a1616;border:1px solid #4a2222;color:#f0a0a0;
+    border-radius:6px;padding:9px 11px;font-size:12px;margin-top:10px;white-space:pre-wrap}
+  .okbox{background:#15261c;border:1px solid #24462f;color:#9fd6b0;
+    border-radius:6px;padding:9px 11px;font-size:12px;margin-top:10px;line-height:1.6}
+  #result{margin-top:14px}
+  .grid{display:flex;flex-wrap:wrap;gap:12px}
+  .shot{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+        padding:10px;width:calc(50% - 6px);min-width:280px}
+  .shot img{width:100%;border-radius:6px;display:block;background:#000}
+  .kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;
+      border-bottom:1px dashed var(--line);color:var(--fg2)}
+  .kv b{color:var(--fg);font-weight:500;text-align:right}
+  .pass{color:var(--ok)} .fail{color:var(--bad)}
+  pre.out{background:#0f1115;border:1px solid var(--line);border-radius:6px;
+    padding:12px;font-size:12px;line-height:1.7;overflow:auto;max-height:320px;
+    white-space:pre-wrap;word-break:break-all;color:#c7cdd6}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid #ffffff44;
+        border-top-color:#fff;border-radius:50%;animation:s .7s linear infinite;
+        vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .sec{margin-top:14px}
+
+  /* 底部常驻发送条：参数摘要 + 单价 + 动作 */
+  #sendbar{position:fixed;left:0;right:0;bottom:0;z-index:35;
+    display:flex;align-items:center;gap:12px;padding:11px 18px;
+    background:#171a1f;border-top:1px solid var(--line);box-shadow:0 -8px 24px #0006}
+  .sb-sum{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg2);min-width:0}
+  .sb-sum b{color:var(--fg);font-weight:600}
+  .sb-sum .dot{color:#3a4049}
+  .sb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .price{font-size:12px;color:var(--fg2);white-space:nowrap}
+  .price b{color:var(--warn);font-weight:600}
+  .price .real{color:var(--ok)}
+  .price .mismatch{color:var(--bad)}
+  button.primary{padding:9px 26px;border:none;border-radius:7px;
+    background:var(--accent);color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button.primary:hover{background:#5aa8ff}
+  button.primary:disabled{background:#2c313a;color:var(--fg3);cursor:not-allowed}
+  button.ghost{background:var(--panel2);color:var(--fg2);border:1px solid var(--line);
+    border-radius:6px;padding:8px 13px;font-size:12px;cursor:pointer;white-space:nowrap}
+  button.ghost:hover{color:var(--fg);border-color:var(--accent)}
+  button.ghost:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>即梦出图工作台</h1>
+  <span class="tag" id="cliTag">CLI 检查中…</span>
+  <span class="tag" id="acctTag">账号 …</span>
+  <span class="tag" id="costTag" title="实扣读 list_task 的 credit_count；user_credit 在权益额度下看不见消耗">实扣 —</span>
+</header>
+
+<main>
+  <!-- 左：参数 -->
+  <section class="card">
+    <h2>参数</h2>
+
+    <label>载入批次</label>
+    <select id="batchSel"><option value="">— 手动配 —</option></select>
+
+    <label>模型档</label>
+    <div class="msel" id="msel">
+      <button class="mbtn" id="mbtn" type="button">
+        <span id="mLabel">5.0Pro</span><span class="mtag on" id="mTag">基准</span>
+        <span class="car">▾</span>
+      </button>
+      <div class="mpop" id="mpop"></div>
+    </div>
+
+    <label>画面比例</label>
+    <div class="ratios" id="ratios"></div>
+
+    <label>尺寸</label>
+    <div class="dim">
+      <input id="w" type="number" value="1920">
+      <button class="lock on" id="lock" type="button" title="锁定宽高比">🔗</button>
+      <input id="h" type="number" value="1080">
+    </div>
+
+    <label>分辨率档</label>
+    <div class="seg" id="reso"></div>
+
+    <label>数量</label>
+    <div class="seg" id="num"></div>
+
+    <label>参考图（每行一个绝对路径）</label>
+    <textarea id="refs" style="min-height:66px" placeholder="留空 = 纯文字"></textarea>
+    <div class="hint">参考强度：<b style="color:var(--warn)">N/A</b>　CLI 无此参数</div>
+  </section>
+
+  <!-- 右：提示词 + 结果 -->
+  <section>
+    <div class="card">
+      <h2>提示词</h2>
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:2">
+          <label style="margin-top:0">从件加载</label>
+          <select id="fileSel"><option value="">— 选一个件 —</option></select>
+        </div>
+        <div style="flex:1.2">
+          <label style="margin-top:0">块</label>
+          <select id="blockSel"></select>
+        </div>
+      </div>
+      <label>正文</label>
+      <textarea id="prompt" placeholder="在这里贴或载入提示词…"></textarea>
+      <div class="meta">
+        <span id="charCount">0 字符 / 0 行</span>
+        <span>否定词 <b id="negScan">—</b></span>
+      </div>
+      <div id="msg"></div>
+    </div>
+
+    <div id="result"></div>
+  </section>
+</main>
+
+<!-- 底部常驻：任何时候都看得见选了啥、要花多少 -->
+<div id="sendbar">
+  <div class="sb-sum">
+    <b id="sbModel">5.0Pro</b>
+    <span class="dot">·</span>
+    <span id="sbSize">16:9 · 1920×1080 · 1.5k</span>
+    <span class="dot">·</span>
+    <span id="sbNum">1 张</span>
+  </div>
+  <div class="sb-right">
+    <span class="price" id="sbPrice">预估 <b>5</b> 分/张</span>
+    <button class="ghost" id="dry">只验参数</button>
+    <button class="primary" id="go">生成</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let ENV = null, LAST = null;
+const STATE = { model:'5.0Pro', ratio:{a:16,b:9}, lock:true, reso:'1.5k', num:1 };
+
+// 比例 = 形状。分辨率档 = 像素量。两者正交，互不改写。
+// 尺寸永远 = SIZE_TABLE[档位][比例]，切比例不动档位、切档位不动比例。
+// 9:16 不列：C01 规定漫剧帧与视频帧共用 16:9，竖屏是作废值。
+const RATIOS = [
+  ['智能',0,0],['1:1',1,1],['16:9',16,9],['3:4',3,4],['4:3',4,3],
+  ['3:2',3,2],['2:3',2,3],['21:9',21,9],['9:21',9,21],
+];
+const RESOS = ['1.5k','2k','4k'];
+
+/* ---------- 尺寸换算 ---------- */
+// 尺寸 = 分辨率档（像素量） × 画面比例（形状）。两者是独立维度，谁也不改谁。
+// 每个格子都是「该档位像素预算内、比例精确」的一个确定值——不是现算出来的近似值。
+const SIZE_TABLE = {
+  '1.5k': {'1:1':[1080,1080], '16:9':[1920,1080], '3:4':[1080,1440], '4:3':[1440,1080],
+           '3:2':[1620,1080], '2:3':[1080,1620], '21:9':[2268,972], '9:21':[972,2268]},
+  '2k':   {'1:1':[1440,1440], '16:9':[2560,1440], '3:4':[1536,2048], '4:3':[2048,1536],
+           '3:2':[2048,1365], '2:3':[1365,2048], '21:9':[3072,1316], '9:21':[1316,3072]},
+  '4k':   {'1:1':[2880,2880], '16:9':[3840,2160], '3:4':[2304,3072], '4:3':[3072,2304],
+           '3:2':[3072,2048], '2:3':[2048,3072], '21:9':[4608,1974], '9:21':[1974,4608]},
+};
+
+function sizeFor(a,b,reso){
+  if(!a||!b) return null;
+  const g = gcd(a,b), key = `${a/g}:${b/g}`;
+  const row = (SIZE_TABLE[reso]||{})[key];
+  if(row) return {w:row[0], h:row[1]};
+  // 表里没有的自定义比例：按该档位的像素预算反解，再夹进边长边界
+  const lim = ENV.limits[reso], lo = lim.side[0], hi = lim.side[1], budget = lim.total*0.88;
+  let w = Math.sqrt(budget*a/b), h = w*b/a;
+  if(Math.max(w,h) > hi){ const k = hi/Math.max(w,h); w*=k; h*=k; }
+  if(Math.min(w,h) < lo){ const k = lo/Math.min(w,h); w*=k; h*=k; }
+  return {w:Math.round(w/2)*2, h:Math.round(h/2)*2};
+}
+function fits(w,h,reso){
+  const lim = ENV.limits[reso];
+  return w>=lim.side[0] && w<=lim.side[1] && h>=lim.side[0] && h<=lim.side[1] && w*h<=lim.total;
+}
+function allowedResos(){
+  return (ENV.reso_by_model[STATE.model]||[]);
+}
+
+/* ---------- 底部摘要 ---------- */
+function ratioLabel(){
+  const r = STATE.ratio;
+  if(!r) return '智能';
+  const g = gcd(r.a,r.b);
+  return `${r.a/g}:${r.b/g}`;
+}
+function gcd(a,b){ return b?gcd(b,a%b):a; }
+function syncBar(){
+  $('sbModel').textContent = STATE.model;
+  const w = +$('w').value||0, h = +$('h').value||0;
+  $('sbSize').textContent = `${ratioLabel()} · ${w}×${h} · ${STATE.reso}`;
+  $('sbNum').textContent = `${STATE.num} 张`;
+  const total = (ENV.price?.est ?? 0) * STATE.num;
+  $('sbPrice').innerHTML = `预估 <b>${ENV.price?.est ?? '?'}</b> 分/张 · 共 <b>${total}</b> 分`;
+}
+
+/* ---------- 模型下拉 ---------- */
+function renderModel(){
+  $('mpop').innerHTML = ENV.models.map(m=>{
+    const meta = (ENV.model_meta||{})[m] || {};
+    const cls = meta.ok ? 'on' : 'off';
+    return `<div class="mitem${m===STATE.model?' on':''}" data-m="${m}">
+      <div class="mtop"><b>${m}</b><span class="mtag ${cls}">${meta.tag||''}</span></div>
+      <div class="mdesc">${meta.desc||''}</div>
+    </div>`;
+  }).join('');
+  const meta = (ENV.model_meta||{})[STATE.model] || {};
+  $('mLabel').textContent = STATE.model;
+  $('mTag').textContent = meta.tag||'';
+  $('mTag').className = 'mtag ' + (meta.ok?'on':'off');
+}
+
+/* ---------- 比例方块 ---------- */
+function renderRatios(){
+  $('ratios').innerHTML = RATIOS.map(([label,a,b])=>{
+    let sty;
+    if(!a||!b){ sty = 'width:20px;height:20px;border-style:dashed'; }
+    else {
+      const M = 22;
+      let w,h;
+      if(a>=b){ w=M; h=Math.max(7, Math.round(M*b/a)); }
+      else    { h=M; w=Math.max(7, Math.round(M*a/b)); }
+      sty = `width:${w}px;height:${h}px`;
+    }
+    const on = (STATE.ratio?.a===a && STATE.ratio?.b===b) ? ' on' : '';
+    return `<div class="rt${on}" data-a="${a}" data-b="${b}">
+      <div class="rg"><div class="rb" style="${sty}"></div></div><span>${label}</span></div>`;
+  }).join('');
+}
+
+function renderReso(){
+  const allow = allowedResos();
+  $('reso').innerHTML = allow.map(r=>
+    `<button type="button" data-r="${r}"${r===STATE.reso?' class="on"':''}>${r.toUpperCase()}</button>`).join('');
+}
+function renderNum(){
+  $('num').innerHTML = [1,2,3,4].map(n=>
+    `<button type="button" data-n="${n}"${n===STATE.num?' class="on"':''}>${n}</button>`).join('');
+}
+
+/* ---------- 应用参数 ---------- */
+function ratioFromSize(w,h){
+  if(!w||!h) return null;
+  const g = gcd(w,h);
+  return {a:w/g, b:h/g};
+}
+function applyRatio(a,b){
+  STATE.ratio = (a&&b) ? {a,b} : null;
+  renderRatios();
+  if(!STATE.ratio){ syncBar(); return; }
+  // 只改尺寸，不动档位——档位是你选的，比例不该替你改它
+  const sz = sizeFor(a,b,STATE.reso);
+  if(sz){ $('w').value = sz.w; $('h').value = sz.h; }
+  syncBar();
+}
+function applyReso(r){
+  STATE.reso = r;
+  if(allowedResos().indexOf(r) < 0){ STATE.reso = allowedResos()[0]||'2k'; }
+  renderReso();
+  if(STATE.ratio){
+    const sz = sizeFor(STATE.ratio.a, STATE.ratio.b, STATE.reso);
+    if(sz){ $('w').value = sz.w; $('h').value = sz.h; }
+  }
+  syncBar();
+}
+// 尺寸被手改：锁链开着就按比例补另一边，并自动挑档
+function onDimInput(src){
+  let w = Math.max(1, Math.round(+$('w').value||0));
+  let h = Math.max(1, Math.round(+$('h').value||0));
+  if(ENV.limits && allowedResos().length){
+    if(!fits(w,h,STATE.reso)){
+      const r = allowedResos().find(x=>fits(w,h,x));
+      if(r){ STATE.reso = r; renderReso(); }
+    }
+  }
+  syncBar();
+}
+
+/* ---------- 启动 ---------- */
+async function boot(){
+  ENV = await (await fetch('/api/env')).json();
+
+  $('cliTag').textContent = ENV.cli ? 'CLI 就绪' : 'CLI 未找到';
+  $('cliTag').className = 'tag ' + (ENV.cli?'ok':'bad');
+  const c = ENV.credit || {};
+  $('acctTag').textContent = c.error ? '账号读取失败'
+    : `${c.vip_level||'?'} / 余额 ${c.total_credit??'?'}`;
+
+  renderModel(); renderRatios(); renderReso(); renderNum();
+
+  // 件列表
+  $('fileSel').innerHTML = '<option value="">— 选一个件 —</option>' +
+    ENV.files.map(f=>`<option value="${f.file}">${f.file}（${f.blocks} 块）</option>`).join('');
+
+  // 批次
+  $('batchSel').innerHTML = '<option value="">— 手动配 —</option>' +
+    (ENV.batches||[]).map(b=>`<option value="${b.id}">${b.label}</option>`).join('');
+
+  $('mbtn').onclick = e => { e.stopPropagation(); $('mpop').classList.toggle('open'); };
+  $('mpop').onclick = e => {
+    const t = e.target.closest('.mitem'); if(!t) return;
+    STATE.model = t.dataset.m; renderModel(); renderReso();
+    if(allowedResos().indexOf(STATE.reso)<0) applyReso(allowedResos()[0]);
+    syncBar(); $('mpop').classList.remove('open');
+  };
+  document.addEventListener('click', ()=> $('mpop').classList.remove('open'));
+
+  $('ratios').onclick = e => {
+    const t = e.target.closest('.rt'); if(!t) return;
+    applyRatio(+t.dataset.a, +t.dataset.b);
+  };
+  $('reso').onclick = e => {
+    const t = e.target.closest('button'); if(!t) return;
+    applyReso(t.dataset.r);
+  };
+  $('num').onclick = e => {
+    const t = e.target.closest('button'); if(!t) return;
+    STATE.num = +t.dataset.n; renderNum(); syncBar();
+  };
+  $('lock').onclick = () => {
+    STATE.lock = !STATE.lock;
+    $('lock').classList.toggle('on', STATE.lock);
+  };
+  $('w').oninput = () => {
+    if(STATE.lock && STATE.ratio){
+      const h = Math.round((+$('w').value) * STATE.ratio.b / STATE.ratio.a);
+      if(h>0) $('h').value = h;
+    }
+    onDimInput('w');
+  };
+  $('h').oninput = () => {
+    if(STATE.lock && STATE.ratio){
+      const w = Math.round((+$('h').value) * STATE.ratio.a / STATE.ratio.b);
+      if(w>0) $('w').value = w;
+    }
+    onDimInput('h');
+  };
+
+  $('batchSel').onchange = e => {
+    const b = (ENV.batches||[]).find(x=>x.id===e.target.value);
+    if(b) applyBatch(b);
+  };
+  $('fileSel').onchange = loadPrompt;
+  $('blockSel').onchange = () => {
+    const d = $('blockSel')._data;
+    const b = d && d[+$('blockSel').value];
+    if(b){ $('prompt').value = b.text; scanPrompt(); }
+  };
+  $('prompt').oninput = scanPrompt;
+  $('go').onclick = go;
+  $('dry').onclick = dryRun;
+
+  applyRatio(16,9);
+}
+
+async function applyBatch(b){
+  STATE.model = b.model; renderModel();
+  // 批次里的尺寸是施工单写死的，直接落，不让比例推荐档覆盖它
+  STATE.reso = b.reso; renderReso();
+  $('w').value = b.w; $('h').value = b.h;
+  STATE.ratio = ratioFromSize(b.w, b.h); renderRatios();
+  STATE.num = b.num; renderNum();
+  $('refs').value = (b.refs||[]).join('\n');
+
+  const d = await (await fetch('/api/prompt?file='+encodeURIComponent(b.file))).json();
+  $('fileSel').value = b.file;
+  $('blockSel').innerHTML = (d.blocks||[]).map((x,i)=>
+    `<option value="${i}"${i===b.block?' selected':''}>${x.label}</option>`).join('');
+  $('blockSel')._data = d.blocks;
+  const tk = (d.blocks||[])[b.block];
+  if (tk){ $('prompt').value = tk.text; scanPrompt(); }
+  syncBar();
+  $('msg').innerHTML = `<div class="okbox"><b>${b.id}</b>　${b.note}</div>`;
+}
+
+async function loadPrompt(){
+  const f = $('fileSel').value;
+  if (!f){ $('blockSel').innerHTML=''; $('blockSel')._data=null; return; }
+  const d = await (await fetch('/api/prompt?file='+encodeURIComponent(f))).json();
+  $('blockSel').innerHTML = (d.blocks||[]).map((b,i)=>
+    `<option value="${i}">${b.label}</option>`).join('');
+  $('blockSel')._data = d.blocks;
+  if (d.blocks && d.blocks.length){
+    $('prompt').value = d.blocks[0].text;
+    scanPrompt();
+  }
+}
+
+function scanPrompt(){
+  const t = $('prompt').value;
+  const lines = t ? t.split('\n').length : 0;
+  $('charCount').textContent = `${t.length} 字符 / ${lines} 行`;
+  const bad = ['不','没','无','别','勿','禁'];
+  const hits = bad.reduce((n,ch)=> n + (t.split(ch).length-1), 0);
+  const el = $('negScan');
+  el.textContent = hits ? `${hits} 处` : '0 处';
+  el.className = hits ? 'fail' : 'pass';
+}
+
+function payload(){
+  return {
+    model: STATE.model,
+    width: +$('w').value,
+    height: +$('h').value,
+    resolution_type: STATE.reso,
+    num: STATE.num,
+    prompt: $('prompt').value,
+    refs: $('refs').value.split('\n').map(s=>s.trim()).filter(Boolean),
+  };
+}
+
+async function dryRun(){
+  const btn = $('dry'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({...payload(), dry_run:true})
+    });
+    const d = await r.json();
+    if (!r.ok){
+      $('msg').innerHTML = `<div class="errbox"><b>参数不合法 · 一分未花</b>\n` +
+        (d.details? d.details.map(x=>'· '+x).join('\n') : '') + `</div>`;
+      return;
+    }
+    const w = d.would_run, total = (ENV.price?.est??0)*w.num;
+    $('msg').innerHTML = `<div class="okbox"><b>参数通过 · 一分未花</b><br>` +
+      `${d.cmd}　${w.model}　${w.width}×${w.height}　${w.reso}　${w.num} 张　` +
+      `参考图 ${w.refs.length} 张　提示词 ${w.prompt_chars} 字符<br>` +
+      `预估 <b>${ENV.price?.est??'?'}</b> 分/张 · 共 <b>${total}</b> 分</div>`;
+  }catch(e){
+    $('msg').innerHTML = `<div class="errbox">${e.message}</div>`;
+  }finally{ btn.disabled = false; }
+}
+
+async function go(){
+  const total = (ENV.price?.est??0)*STATE.num;
+  if(!confirm(`确认生成？\n\n${STATE.model}　${$('w').value}×${$('h').value}　${STATE.reso}　${STATE.num} 张\n预估 ${ENV.price?.est??'?'} 分/张 · 共 ${total} 分\n\n实扣以 credit_count 为准。`)){
+    return;
+  }
+  $('msg').innerHTML = '';
+  $('result').innerHTML = '';
+  const btn = $('go');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>提交中…';
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 8*60*1000);
+  try{
+    const r = await fetch('/api/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload()), signal: ctrl.signal
+    });
+    const d = await r.json();
+    if (!r.ok){
+      $('msg').innerHTML = `<div class="errbox"><b>${d.error||'失败'}</b>\n` +
+        (d.details? d.details.map(x=>'· '+x).join('\n') : '') + `</div>`;
+      return;
+    }
+    if (!d.ok){
+      $('msg').innerHTML = `<div class="errbox"><b>提交失败</b>\n` +
+        JSON.stringify(d.error, null, 2) + `</div>`;
+      return;
+    }
+    LAST = d;
+    render(d);
+    refreshCredit();
+  }catch(e){
+    $('msg').innerHTML = `<div class="errbox">请求失败：${e.message}\n（任务可能仍在跑，去 CLI 用 list_task 查）</div>`;
+  }finally{
+    clearTimeout(timer);
+    btn.disabled = false;
+    btn.textContent = '生成';
+  }
+}
+
+function render(d){
+  const imgs = (d.images||[]).filter(x=>x.width);
+  const rq = d.requested;
+  const est = (ENV.price?.est??0)*rq.num;
+  const real = d.credit_count_present ? d.real_cost : null;
+
+  // 顶部实扣标 + 底部并排（预估 vs 实扣）
+  $('costTag').textContent = real!==null ? `实扣 ${real} 分` : '实扣未知';
+  $('costTag').className = 'tag ' + (real!==null ? (real===est?'ok':'bad') : 'bad');
+  $('sbPrice').innerHTML = real!==null
+    ? `预估 <b>${est}</b> · 实扣 <span class="${real===est?'real':'mismatch'}">${real}</span> 分`
+    : `预估 <b>${est}</b> 分 · 实扣未取到`;
+
+  let html = `<div class="card sec"><h2>结果 · 批次 ${d.batch}</h2>`;
+  html += `<div class="grid" style="margin-bottom:12px"><div style="flex:1;min-width:280px">
+      <div class="kv"><span>模型档</span><b>${rq.model}</b></div>
+      <div class="kv"><span>队列名</span>
+        <b class="${/v50p/.test(d.queue_name)?'pass':'fail'}">${d.queue_name||'—'}</b></div>
+      <div class="kv"><span>画幅（请求 / 回读）</span>
+        <b>${rq.width}×${rq.height}${imgs[0]?' / '+imgs[0].width+'×'+imgs[0].height:''}</b></div>
+      <div class="kv"><span>分辨率档</span><b>${rq.reso}</b></div>
+      <div class="kv"><span>数量</span><b>${rq.num}</b></div>
+      <div class="kv"><span>参考图</span><b>${rq.refs.length? rq.refs.length+' 张' : '无'}</b></div>
+      <div class="kv"><span>参考强度</span><b style="color:var(--warn)">N/A</b></div>
+      <div class="kv"><span>submit_id</span><b style="font-size:11px">${d.submit_id||'—'}</b></div>
+    </div></div>`;
+
+  if (!imgs.length){
+    html += `<div class="errbox">没拿到图片。去 ${d.outdir} 看看有没有文件。</div>`;
+  }
+
+  html += `<div class="grid">` + imgs.map(im=>{
+    const src = '/api/image?path=' + encodeURIComponent(im.path);
+    return `<div class="shot">
+      <img src="${src}" alt="">
+      <div class="kv"><span>尺寸</span><b>${im.width}×${im.height}</b></div>
+      <div class="kv"><span>文件</span><b style="font-size:11px">${im.path.split(/[\\/]/).pop()}</b></div>
+      <div class="kv"><span>右下角近白</span><b>${im.corners['右下'].near_white_pct}%</b></div>
+      <div class="kv"><span>四角均值</span><b>${['左上','右上','左下','右下'].map(k=>im.corners[k].mean).join(' / ')}</b></div>
+      <div class="kv"><span>净版</span>
+        <b class="${im.clean?'pass':'fail'}">${im.clean?'✓ 净版':'⚠ 疑似角标'}</b></div>
+      <div class="hint">${im.clean_reason}</div>
+    </div>`;
+  }).join('') + `</div>`;
+
+  html += `<div class="sec"><h2 style="font-size:11px;color:var(--fg3);margin:0 0 8px">台账片段</h2>
+    <pre class="out" id="abText"></pre>
+    <button class="ghost" onclick="copyAB()" style="margin-top:8px">复制 A+B 段</button></div>`;
+  html += `</div>`;
+  $('result').innerHTML = html;
+  $('abText').textContent = buildAB(d);
+}
+
+function buildAB(d){
+  const rq = d.requested, im = (d.images||[])[0] || {};
+  const now = new Date();
+  const t = now.toISOString().slice(0,16).replace('T',' ');
+  return `### 批次 \`<待填K号>\` · ${t} · CLI · ${rq.num} 张
+
+| 段 | 项 | 值 |
+|---|---|---|
+| A | 通道 | CLI（\`dreamina ${rq.refs.length?'image2image':'text2image'}\`） |
+| A | 模型档 | \`--model_version=${rq.model}\`；队列名 \`${d.queue_name||'未取到'}\` |
+| A | 画幅 | 请求 \`--width=${rq.width} --height=${rq.height}\`；回读 **${im.width||'?'}×${im.height||'?'}** |
+| A | 分辨率档 | \`${rq.reso}\` |
+| A | 数量 | \`--generate_num=${rq.num}\` |
+| A | 参考图 | ${rq.refs.length? rq.refs.map(p=>'\n  · '+p).join('') : '**无**（纯文字）'} |
+| A | 参考强度 | **\`N/A（CLI 无此参数）\`** |
+| A | 提示词出处 | 见对应提示词件（${$('prompt').value.length} 字符） |
+| A | 本轮改了什么 | 待填 |
+| A | 预判 | 待填 |
+| A | 作者确认 | **${t} 作者点击生成**（界面即公示） |
+| A | 预计花费 | 预估 ${(ENV.price?.est??0)*rq.num} 分 |
+| B | 产物 | \`${im.path? im.path.split(/[\\/]/).pop():'—'}\`（${im.width||'?'}×${im.height||'?'}，右下角近白 ${im.corners?im.corners['右下'].near_white_pct:'?'}%，${im.clean?'净版':'疑似角标'}） |
+| B | 实扣 | **\`credit_count: ${d.credit_count_present? d.real_cost : '未取到'}\`** |
+| B | 判定 | ⚪ 待跑（待判） |
+| B | 判据逐条 | 待填 |
+`;
+}
+
+function copyAB(){
+  navigator.clipboard.writeText($('abText').textContent).then(()=>{
+    const b = event.target; b.textContent='已复制'; setTimeout(()=>b.textContent='复制 A+B 段',1200);
+  });
+}
+
+async function refreshCredit(){
+  const d = await (await fetch('/api/env')).json();
+  const c = d.credit || {};
+  $('acctTag').textContent = c.error ? '账号读取失败'
+    : `${c.vip_level||'?'} / 余额 ${c.total_credit??'?'}`;
+}
+
+boot();
+</script>
+</body>
+</html>
