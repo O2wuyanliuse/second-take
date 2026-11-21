@@ -7,6 +7,9 @@ name: ci
 on:
   push:
   pull_request:
+  # 手动触发：新库刚开 Actions、或想重跑一次时用，不必推空提交。
+  # 没有这一行，「动作」页右边不会出现「运行工作流」按钮。
+  workflow_dispatch:
 
 jobs:
   check:
