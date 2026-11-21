@@ -30,8 +30,20 @@ jobs:
       # 先幂等 init（缺目录就建），再 check（退出 0 才算合格）。
       - name: ② 启动自检（干净机器：先建再验）
         run: python tools/bootstrap.py && python tools/bootstrap.py --check
+      # 本库退出码约定：0 绿 ／ 1 阻断 ／ **2 提示**。GitHub Actions 只认 0，
+      # 直接 `run: python gate/_gate.py` 会把「提示档」判成失败——17 次运行全红就是它。
+      # 与 `.githooks/pre-commit` 的 run() 同一条口径。
       - name: ③ 门禁（骨架库只覆盖 3/19，跳过不算绿）
-        run: python gate/_gate.py
+        shell: bash
+        run: |
+          set +e
+          python gate/_gate.py
+          rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+            echo "::error::门禁返回 $rc（1＝阻断），不是提示档"
+            exit "$rc"
+          fi
+          echo "门禁退出码 $rc（2＝提示档，不是红）"
       - name: ④ 断链（文档里写的路径真的存在）
         run: python gate/_links.py
       # ⑤ 用公库自带的禁用词表，**不借私库词表**——那正是它能进 CI 的原因。
@@ -39,6 +51,14 @@ jobs:
       #    （`--deny ... --strict` 在本地跑），也免得每次 push 都扫 90 个提交。
       - name: ⑤ 脱敏（公库自带禁用词，只看当前树）
         run: python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
-      # ⑥ 改了流程相关目录就必须同步改维护方法，否则提交信息要带 [no-procedure-change: 理由]
+      # ⑥ 比较基准必须是「推送前那个提交」，不能用 origin/master：
+      # push 到 master 时 origin/master 就是刚推的 HEAD，diff 恒为空——那是个永远绿的假检查。
       - name: ⑥ 维护方法双写
-        run: python tools/check_maintenance.py --base origin/master
+        shell: bash
+        run: |
+          BASE="${{ github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "首次推送，没有可比基准——本步不判。"
+            exit 0
+          fi
+          python tools/check_maintenance.py --base "$BASE"
