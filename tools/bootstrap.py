@@ -101,8 +101,49 @@ def run_check(root):
         say("结论: 环境未合格。按上面逐条补齐后再跑一次 --check。")
         return 1
     say("")
+    # 钩子只是**本机**的快速反馈，缺了不算环境不合格（CI 里还有同一套），
+    # 所以这里给提示、不进 problems——否则 CI 的 --check 会永远红。
+    hrc, hcur = git_out("config", "--local", "--get", "core.hooksPath")
+    if (REPO / ".githooks").is_dir() and (hrc != 0 or not hcur):
+        say("[提示] 本机还没接 .githooks：跑 python tools/bootstrap.py 会接上（CI 不需要它）")
     say("结论: 可以开工。")
     return 0
+
+
+def git_out(*args):
+    """跑一条只读/写入本机配置的 git 命令。失败返回 (rc, "")，不抛。"""
+    try:
+        r = subprocess.run(["git"] + list(args), cwd=str(REPO), capture_output=True,
+                           text=True, encoding="utf-8", errors="replace")
+    except OSError:
+        return 1, ""
+    return r.returncode, (r.stdout or "").strip()
+
+
+def wire_hooks():
+    """把仓库自带的钩子接到本机：只写 `--local`，不覆盖已有的设定。
+
+    为什么必须由 bootstrap 做：`.githooks/` 在仓库里，`core.hooksPath` 在**本机**配置里。
+    新 clone 的人没有那一行，于是「门禁在我机器上是绿的」只对作者成立——
+    评价里那句「门禁在你这儿绿，等于假安全」说的就是它。
+    """
+    if not (REPO / ".git").exists():
+        return
+    if not (REPO / ".githooks").is_dir():
+        say("[4/6] 本仓库没有 .githooks/, 跳过钩子。")
+        return
+    rc, cur = git_out("config", "--local", "--get", "core.hooksPath")
+    if rc != 0 or not cur:
+        rc2, _ = git_out("config", "--local", "core.hooksPath", ".githooks")
+        if rc2 == 0:
+            say("[4/6] 钩子已接: core.hooksPath → .githooks（本机配置, 不进仓库）")
+        else:
+            say("[提示] 钩子没接上（git config 失败）。手动跑: git config core.hooksPath .githooks")
+        return
+    if cur.replace("\\", "/").rstrip("/") in (".githooks", str(REPO / ".githooks").replace("\\", "/")):
+        say("[4/6] 钩子已指向 .githooks, 不动。")
+        return
+    say("[提醒] core.hooksPath 已指向 %s, 不动它。要用本仓库钩子: git config core.hooksPath .githooks" % cur)
 
 
 def run_init(root):
@@ -113,36 +154,38 @@ def run_init(root):
         return 1
 
     say("== 初始化 ==")
-    say("[1/5] 探测: python %s / git 可用 / 输出强制 UTF-8" % sys.version.split()[0])
+    say("[1/6] 探测: python %s / git 可用 / 输出强制 UTF-8" % sys.version.split()[0])
 
     for name in ("",) + SUBDIRS:
         d = root / name if name else root
         if d.is_dir():
             continue
         d.mkdir(parents=True, exist_ok=True)
-        say("[2/5] 已创建工作区目录: %s" % d)
+        say("[2/6] 已创建工作区目录: %s" % d)
     if root.is_dir() and not any(True for _ in [1]):
         pass
 
     if CONFIG_LOCAL.exists():
-        say("[3/5] 配置文件已存在, 不动: %s" % CONFIG_LOCAL.name)
+        say("[3/6] 配置文件已存在, 不动: %s" % CONFIG_LOCAL.name)
     elif CONFIG_EXAMPLE.exists():
         data = json.loads(CONFIG_EXAMPLE.read_text(encoding="utf-8"))
         data.setdefault("workspace_root", "workspace")
         CONFIG_LOCAL.write_text(
             json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
-        say("[3/5] 已生成配置文件: %s (来自 config.example.json)" % CONFIG_LOCAL.name)
+        say("[3/6] 已生成配置文件: %s (来自 config.example.json)" % CONFIG_LOCAL.name)
     else:
         CONFIG_LOCAL.write_text(
             json.dumps({"workspace_root": "workspace"}, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        say("[3/5] 没有 config.example.json, 已写最小配置: %s" % CONFIG_LOCAL.name)
+        say("[3/6] 没有 config.example.json, 已写最小配置: %s" % CONFIG_LOCAL.name)
+
+    wire_hooks()
 
     gate = REPO / "gate" / "_gate.py"
     if gate.exists():
-        say("[4/5] 跑一次最小门禁 ...")
+        say("[5/6] 跑一次最小门禁 ...")
         try:
             r = subprocess.run(
                 [sys.executable, str(gate)],
@@ -159,12 +202,12 @@ def run_init(root):
         except Exception as e:
             say("[注意] 门禁没跑起来 (%s), 跳过。" % e)
     else:
-        say("[4/5] 本仓库没有 gate/_gate.py, 跳过门禁。")
+        say("[5/6] 本仓库没有 gate/_gate.py, 跳过门禁。")
 
     if not git_ignores_workspace() and (REPO / ".git").exists():
         say("[提醒] .gitignore 里还没有 workspace/, 建议加一行, 免得把用户材料提交上去。")
 
-    say("[5/5] 下一步:")
+    say("[6/6] 下一步:")
     say("  python tools/bootstrap.py --check")
     say("  (然后按 README 的三条命令走到第一格)")
     say("")

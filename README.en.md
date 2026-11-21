@@ -30,7 +30,7 @@ Then open `开工提示词.md` (Chinese) and paste that block into your AI assis
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
 | `packaging/` | Packing and de-identification: leak scan, duplicate check, package verify |
 | `tools/` | Batch panel, asset measurement, bootstrap, release |
-| `tests/` | 30 cases that test the checkers themselves — `python -m pytest -q` |
+| `tests/` | 32 cases that test the checkers themselves — `python -m pytest -q` |
 
 ## Three premises
 

@@ -65,5 +65,5 @@ jobs:
           python tools/check_maintenance.py --base "$BASE"
       # ⑦ 用例测的是「检查器还有没有牙」：无词表给不给绿、断链报不报、双写会不会被
       #    下一条提交的免责标签顶掉。改判据的人先在这里红，别等发布那天红。
-      - name: ⑦ 用例（30 条，测本库的检查器）
+      - name: ⑦ 用例（32 条，测本库的检查器）
         run: python -m pytest -q

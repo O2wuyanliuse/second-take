@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """启动自检：它说「可以开工」的时候，是真的可以开工。"""
 
-from helpers import copy_into, run
+from helpers import copy_into, git, run, write
 
 
 def bootstrap(sandbox):
@@ -54,3 +54,24 @@ def test_root_flag_wins_over_repo_workspace(sandbox, tmp_path):
     # 工作区在别处，--check 也要认这个 --root，否则「建好了却说不合格」
     r2 = run(sandbox, "tools/bootstrap.py", "--check", "--root", str(other))
     assert r2.returncode == 0, r2.stdout
+
+
+def test_init_wires_hooks(sandbox):
+    """钩子在仓库里、hooksPath 在本机配置里——不接上，门禁只对作者生效。"""
+    bootstrap(sandbox)
+    write(sandbox, ".githooks/pre-commit", "#!/bin/sh\nexit 0\n")
+    r = run(sandbox, "tools/bootstrap.py")
+    assert r.returncode == 0, r.stdout
+    assert git(sandbox, "config", "--local", "--get", "core.hooksPath").stdout.strip() == ".githooks"
+    assert "钩子已接" in r.stdout
+
+
+def test_init_keeps_existing_hookspath(sandbox):
+    """已经指向别处就别抢——那是使用者自己的选择。"""
+    bootstrap(sandbox)
+    write(sandbox, ".githooks/pre-commit", "#!/bin/sh\nexit 0\n")
+    git(sandbox, "config", "--local", "core.hooksPath", "myhooks")
+    r = run(sandbox, "tools/bootstrap.py")
+    assert r.returncode == 0, r.stdout
+    assert git(sandbox, "config", "--local", "--get", "core.hooksPath").stdout.strip() == "myhooks"
+    assert "不动它" in r.stdout
