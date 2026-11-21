@@ -14,6 +14,7 @@ r"""second-take 启动自检/初始化。
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -129,6 +130,7 @@ def wire_hooks():
     评价里那句「门禁在你这儿绿，等于假安全」说的就是它。
     """
     if not (REPO / ".git").exists():
+        say("[4/6] 这里不是 git 仓库, 跳过钩子（包里不带 .githooks/, 这是设计）")
         return
     if not (REPO / ".githooks").is_dir():
         say("[4/6] 本仓库没有 .githooks/, 跳过钩子。")
@@ -194,8 +196,9 @@ def run_init(root):
     wire_hooks()
 
     gate = REPO / "gate" / "_gate.py"
+    gate_bad = ""
     if gate.exists():
-        say("[5/6] 跑一次最小门禁 ...")
+        say("[5/6] 体检预览：跑一次门禁（只看不拦，不影响启动）...")
         try:
             r = subprocess.run(
                 [sys.executable, str(gate)],
@@ -206,9 +209,11 @@ def run_init(root):
                 encoding="utf-8",
                 errors="replace",
             )
-            say((r.stdout or "").strip() or "(门禁无输出)")
+            out = (r.stdout or "").strip()
+            say(out or "(门禁无输出)")
             if r.returncode != 0:
-                say("[注意] 门禁返回 %d: 不影响首次启动, 但开工前请按上面的提示处理。" % r.returncode)
+                m = re.search(r"阻断\s*(\d+)", out)
+                gate_bad = m.group(1) if m else "若干"
         except Exception as e:
             say("[注意] 门禁没跑起来 (%s), 跳过。" % e)
     else:
@@ -221,7 +226,9 @@ def run_init(root):
     say("  python tools/bootstrap.py --check")
     say("  (然后按 README 的三条命令走到第一格)")
     say("")
-    say("结论: 环境就绪。")
+    say("结论: 环境就绪（可以开工）。")
+    if gate_bad:
+        say("门禁: 有 %s 项阻断（与启动无关），开工前照上面那条处理。" % gate_bad)
     return 0
 
 
