@@ -98,7 +98,8 @@ def run_check(root):
         for p in problems:
             say("[缺] %s" % p)
         say("")
-        say("结论: 环境未合格。按上面逐条补齐后再跑一次 --check。")
+        say("结论: 环境未合格。这一条属于「还没建」，不是装坏了。")
+        say("下一句: python tools/bootstrap.py —— 它会把上面缺的自动建好；建完再跑一次 --check。")
         return 1
     say("")
     # 钩子只是**本机**的快速反馈，缺了不算环境不合格（CI 里还有同一套），

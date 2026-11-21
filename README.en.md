@@ -14,10 +14,13 @@ Python 3.11+ and git. Nothing else to install.
 ```bash
 git clone <this repo>
 cd second-take
+python3 tools/bootstrap.py             # Windows: python tools/bootstrap.py
 python3 tools/bootstrap.py --check     # Windows: python tools/bootstrap.py --check
 ```
 
 Exit code `0` means the environment is ready. Anything else prints exactly what is missing and how to fix it. Directories it needs, it creates itself.
+
+**On a fresh clone the first command is `bootstrap.py` (create), not `--check` (inspect).** `--check` first always fails on a clean machine — that is "not built yet", not "broken".
 
 Then open `开工提示词.md` (Chinese) and paste that block into your AI assistant — it asks you three questions (where the source is / what genre / how it relates to the original), then takes you to your first frame. You don't need to read anything else before that.
 

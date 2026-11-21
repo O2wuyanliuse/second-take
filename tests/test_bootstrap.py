@@ -14,6 +14,7 @@ def test_empty_repo_is_not_ready(sandbox):
     assert r.returncode == 1
     assert "缺少目录" in r.stdout
     assert "环境未合格" in r.stdout
+    assert "下一句" in r.stdout
 
 
 def test_init_creates_workspace_and_config(sandbox):

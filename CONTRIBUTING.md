@@ -13,6 +13,8 @@ git config core.hooksPath .githooks
 装完，`git commit` 会先跑门禁、断链、脱敏三件；`git push` 再跑一遍脱敏。
 **`--no-verify` 能绕过它**——所以 CI 里还有同一套，缺一层就只防君子。
 
+要改 `gate/`／`packaging/`／`tools/`／`.github/` 里的东西，先读 `docs/maintain/维护方法.md`：同一个提交里必须更新它的 §9，否则 CI ⑥ 会红（提交信息写 `[no-procedure-change: 理由]` 可豁免）。
+
 ## 贡献条款（提 PR 前必读）
 
 提交 Pull Request，即视为你同意以下两条：

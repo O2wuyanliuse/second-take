@@ -17,10 +17,11 @@
 ## 打开先做（第 0 步，先于一切）
 
 ```bash
-<python> tools/bootstrap.py --check
+<python> tools/bootstrap.py          # 先建：缺的目录与 config.local.json 由它补
+<python> tools/bootstrap.py --check  # 再查：退出 0 才算环境合格
 ```
 
-退出 **0** 才算环境合格。不是 0 就按它打印的逐条补——**它会自己建目录，你别回头问用户「该建什么」**。
+`--check` 在干净机器上必然红，**那不是装坏了，是还没建**——别把这句话回给用户当报错。不是 0 就按它打印的逐条补，**目录缺了自己建，别回头问用户「该建什么」**。
 
 `<python>` ＝ PowerShell 的 `python` ／ POSIX 的 `python3`。
 
