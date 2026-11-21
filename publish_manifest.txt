@@ -10,9 +10,6 @@
 # （禁用词表是敏感件：它必须写出要禁的词，所以它不进包、也不该留在公库里）
 
 .gitattributes
-.githooks/commit-msg
-.githooks/pre-commit
-.githooks/pre-push
 .github/ISSUE_TEMPLATE/bug_report.md
 .github/ISSUE_TEMPLATE/config.yml
 .github/ISSUE_TEMPLATE/suggestion.md

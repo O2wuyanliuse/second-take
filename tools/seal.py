@@ -7,7 +7,10 @@
   seal.py check <zip>  --from-release v0.5.1 --asset second-take-0.5.1-win.zip
 
 封条内容（json，随边上放 <zip>.seal.json）：
-  sha256 / bytes / files / head / version / manifest_sha / words_source / created
+  sha256 / bytes / files / head / version / manifest_sha / words_sha256 / words_count / created
+
+封条会随 release 一起公开发出去——所以**只记词表的指纹，不记词表的路径**。
+（2026-11-21 修：原来写 words_source 全路径，等于把私库目录名贴到公开资产里。）
 
 退出码：0 = 对得上；1 = 对不上（红）；2 = 缺封条或缺件（黄，也不许发）。
 """
@@ -65,7 +68,6 @@ def cmd_seal(a):
         version = version.lstrip("\ufeff").split("·")[0].strip() if version else ""
     man = repo / "publish_manifest.txt"
     man_sha = sha256_of(man) if man.exists() else ""
-    words_source = a.words or ""
     words = []
     if a.words and Path(a.words).exists():
         raw = Path(a.words).read_text(encoding="utf-8", errors="replace")
@@ -81,7 +83,7 @@ def cmd_seal(a):
         "head": head,
         "version": version,
         "manifest_sha": man_sha,
-        "words_source": words_source,
+        "words_sha256": hashlib.sha256("\n".join(words).encode("utf-8")).hexdigest() if words else "",
         "words_count": len(words),
         "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }

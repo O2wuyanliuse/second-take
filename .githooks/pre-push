@@ -1,9 +1,11 @@
 #!/bin/sh
 # second-take 推送前强制核验（第二重保险）
-# 装法：git config core.hooksPath .githooks   （bootstrap.py 会顺手设）
+# 装法：git config core.hooksPath .githooks   （tools/bootstrap.py 会顺手设）
 #
-# 规矩：**核不了就不许推**。找不到解释器、找不到核验脚本，都按红处理——
-# 否则「把脚本删掉」就成了绕过方式。
+# 2026-11-21 v3：钩子只做三件事——找到 python、确认工具与词表在、把 push 清单交给判据。
+# 判据全在 tools/verify_release.py --push-gate（本地与 CI 同一份代码），它逐 ref 判：
+# 树里有没有词表、该 ref 自己的全部历史里有没有命中、版本 tag 的包有没有封条。
+# 旧版只核工作区 HEAD，推旧历史分支时钩子看不见——那是绕过口，已堵。
 set -u
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
@@ -27,8 +29,7 @@ PY=$(find_py)
 if [ -z "$PY" ]; then
   echo ""
   echo "[blocked] 找不到 python，无法核验 → 拒绝推送。"
-  echo "  装 python，或把解释器路径写进 .git/second-take-python"
-  echo "  （或设环境变量 SECOND_TAKE_PYTHON）。"
+  echo "  装 python，或把解释器路径写进 .git/second-take-python（或设 SECOND_TAKE_PYTHON）。"
   exit 1
 fi
 
@@ -40,10 +41,6 @@ if [ ! -f "$TOOL" ]; then
   exit 1
 fi
 
-echo ""
-echo "== 推送前核验（tools/verify_release.py）=="
-# 词表不在仓库里（2026-11-21 搬出）：本地从 SECOND_TAKE_WORDS 或 .ci/denylist.txt 取。
-# 两处都没有 → 核不了，按拒绝推送处理——**不许静默降级成「跳过」**。
 WORDS="${SECOND_TAKE_WORDS:-.ci/denylist.txt}"
 if [ ! -s "$WORDS" ]; then
   echo ""
@@ -52,44 +49,16 @@ if [ ! -s "$WORDS" ]; then
   echo "  没有词表就核不了——核不了不许推。"
   exit 1
 fi
-# 历史一起扫：只扫当前树等于放过「改文件但旧提交还在」那一半。
-"$PY" -X utf8 "$TOOL" --no-zip --words "$WORDS"
+
+# stdin 上的推送清单原样交给判据（钩子不解析它，少一处能写错的地方）。
+"$PY" -X utf8 "$TOOL" --push-gate --words "$WORDS"
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo ""
   echo "[blocked] 核验未通过（退出码 $rc）→ 拒绝推送。"
-  echo "  绿才推。红了就改，不要改这个钩子。"
+  echo "  绿才推。红了就改，不要改这个钩子。旧历史只留本地 bundle，不要 git push --all / --mirror。"
   exit 1
 fi
-
-# 推 tag 时额外要求：包必须有封条，且封条对得上
-while read -r local_ref local_sha remote_ref remote_sha; do
-  case "$remote_ref" in
-    refs/tags/v*)
-      ver=$(echo "$remote_ref" | sed "s#refs/tags/v##")
-      zip="${SECOND_TAKE_ZIP:-../second-take-$ver-win.zip}"
-      if [ ! -f "$zip" ]; then
-        echo ""
-        echo "[blocked] 要推 $remote_ref，但找不到包：$zip"
-        echo "  先打包装封（build_public_package.py → seal.py seal），再推 tag。"
-        exit 1
-      fi
-      if [ ! -f "$zip.seal.json" ]; then
-        echo ""
-        echo "[blocked] 包没有封条：$zip.seal.json"
-        echo "  无封条的包不许发。"
-        exit 1
-      fi
-      echo "== tag $remote_ref 的封条核验 =="
-      "$PY" -X utf8 tools/seal.py check "$zip"
-      if [ $? -ne 0 ]; then
-        echo ""
-        echo "[blocked] 封条对不上 → 拒绝推 tag。"
-        exit 1
-      fi
-      ;;
-  esac
-done
 
 echo ""
 echo "[ok] 核验通过，放行。"

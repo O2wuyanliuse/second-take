@@ -52,6 +52,19 @@ LATEST = ROOT / "latest.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
 GATE = ROOT / "gate" / "_gate.py"
 
+
+def repo_slug():
+    """从 origin 推 owner/repo，不写死。仓库改名或搬家之后这里自动跟上。"""
+    url = subprocess.run([GIT, "remote", "get-url", "origin"],
+                         capture_output=True, text=True).stdout.strip()
+    m = re.search(r"github\.com[:/]+([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise SystemExit("无法从 origin 推断 owner/repo：" + (url or "(空)"))
+    return m.group(1) + "/" + m.group(2)
+
+
+OWNER_REPO = repo_slug()
+
 BANNED = [
     "重构", "优化", "修复若干", "底层", "架构", "性能提升",
     "若干问题", "体验更佳", "稳定性增强",
@@ -213,7 +226,7 @@ def build_latest(old_data: dict, new: str, date: str, channel: str, severity: st
     data["date"] = date
     data["channel"] = channel
     data["severity"] = severity
-    owner = "O2wuyanliuse/second-take"
+    owner = OWNER_REPO
     data["notes_url"] = "https://github.com/%s/releases/tag/v%s" % (owner, new)
     packs = data.get("pack_urls") or {}
     if isinstance(packs, dict):

@@ -40,7 +40,7 @@ def find_git(explicit=None):
         return w
     for c in (
         "C:/Program Files/Git/cmd/git.exe",
-        "C:/Program Files (x86)/Git/cmd/git.exe",
+        "C:/Program Files/Git/cmd/git.exe",
     ):
         if Path(c).exists():
             return c
@@ -118,8 +118,8 @@ def scan_zip(path, words):
     return len(names), flat, has_deny, suspicious
 
 
-def scan_history(repo, words, limit=6):
-    rc, revs = repo.run(["rev-list", "HEAD"])
+def scan_history(repo, words, limit=6, rev="HEAD"):
+    rc, revs = repo.run(["rev-list", rev])
     revs = revs.split()
     if not revs:
         return 0, []
@@ -139,6 +139,42 @@ def scan_history(repo, words, limit=6):
     return len(items), [(k[0], k[1], k[2], sorted(v)) for k, v in items][:limit]
 
 
+def check_ref(repo, words, ref):
+    """扫一个 ref：树里有没有词表、它自己的全部历史里有没有命中。"""
+    deny_here = repo.ok(["cat-file", "-e", ref + ":" + WORDS_FILE])[0]
+    n, items = scan_history(repo, words, rev=ref)
+    ncommits = len(repo.ok(["rev-list", ref])[1].split())
+    return deny_here, n, items, ncommits
+
+
+def read_push_refs(stream):
+    refs = []
+    for line in stream:
+        parts = line.split()
+        if len(parts) >= 4:
+            refs.append(parts[:4])
+    return refs
+
+
+def seal_status(zip_path):
+    zip_path = Path(zip_path)
+    sj = Path(str(zip_path) + ".seal.json")
+    if not zip_path.exists():
+        return False, "找不到包 " + str(zip_path)
+    if not sj.exists():
+        return False, "包没有封条 " + str(sj)
+    try:
+        data = json.loads(sj.read_text(encoding="utf-8").lstrip("\ufeff"))
+    except Exception as e:
+        return False, "封条读不动：" + str(e)
+    sha = sha256_of(zip_path)
+    size = zip_path.stat().st_size
+    if sha != data.get("sha256") or size != data.get("bytes"):
+        return False, ("封条对不上：盘上 " + sha[:8] + " / " + str(size) + " B，封条 "
+                       + str(data.get("sha256"))[:8] + " / " + str(data.get("bytes")) + " B")
+    return True, "封条对得上 " + sha[:8] + " · " + str(size) + " B · " + str(data.get("files")) + " 个文件"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default=os.environ.get("SECOND_TAKE_REPO", "D:/dev/second-take"))
@@ -148,6 +184,10 @@ def main():
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-zip", action="store_true", help="只判树与历史，不判包（CI 打包前用）")
     ap.add_argument("--expect-tag", default="", help="CI 用：tag 名必须与最新 tag 一致")
+    ap.add_argument("--push-gate", action="store_true",
+                    help="钩子用：从 stdin 读推送清单，逐个 ref 判树/历史/封条")
+    ap.add_argument("--scan-ref", default="",
+                    help="只核某一个 ref（推分支/推旧历史前用）：扫它的树与它的全部历史")
     a = ap.parse_args()
 
     rows = []
@@ -167,6 +207,68 @@ def main():
 
     _, head = repo.ok(["rev-parse", "--short", "HEAD"])
     rc, _ = repo.run(["rev-parse", "--verify", "HEAD"])
+
+    # --push-gate：钩子用。读 stdin 上的推送清单，逐个 ref 判——不看工作区 HEAD 就算数。
+    if a.push_gate:
+        words = []
+        if a.words and Path(a.words).exists():
+            words = parse_words(Path(a.words).read_text(encoding="utf-8", errors="replace"))
+        if not words:
+            row("词表", "没给 --words，核不了", RED)
+            return report(rows, str(a.repo), head)
+        refs = read_push_refs(sys.stdin)
+        if not refs:
+            row("推送清单", "stdin 上没有 refs，核不了", RED)
+            return report(rows, str(a.repo), head)
+        bad = False
+        seen = []
+        for lref, lsha, rref, rsha in refs:
+            if lsha.strip("0") == "":
+                row("删除", lref + " 是删除 ref，没有内容要核", GREEN)
+                continue
+            label = lref + " → " + lsha[:7]
+            new_sha = lsha not in seen
+            if new_sha:
+                seen.append(lsha)
+                deny_here, n, items, ncommits = check_ref(repo, words, lsha)
+                row("树", label + (" 带着词表" if deny_here else " 树里没有词表"), RED if deny_here else GREEN)
+                if deny_here:
+                    bad = True
+                row("历史", label + " 的 " + str(ncommits) + " 个提交 · 命中 " + str(n) + " 处",
+                    RED if n else GREEN)
+                if n:
+                    bad = True
+                for path, ln, text, commits in items[:6]:
+                    row("", path + ":" + str(ln) + " " + text + " @ " + ",".join(commits[:6]), RED)
+            if lref.startswith("refs/tags/v"):
+                ver = lref[len("refs/tags/v"):]
+                cand = [Path(a.zip)] if a.zip else []
+                cand.append(Path(str(a.repo)) / ".." / ("second-take-" + ver + "-win.zip"))
+                zpath = next((z for z in cand if z.exists()), cand[-1])
+                ok, msg = seal_status(zpath)
+                row("封条", label + " · " + msg, GREEN if ok else RED)
+                if not ok:
+                    bad = True
+        return report(rows, str(a.repo), head, RED if bad else GREEN)
+
+    # --scan-ref：钩子用。只看「这次要推上去的那个 ref」，不看 HEAD。
+    if a.scan_ref:
+        words = []
+        if a.words and Path(a.words).exists():
+            words = parse_words(Path(a.words).read_text(encoding="utf-8", errors="replace"))
+        if not words:
+            row("词表", "没给 --words，核不了", YELLOW)
+            return report(rows, str(a.repo), head)
+        _, sref = repo.ok(["rev-parse", "--short", a.scan_ref])
+        deny_here = repo.ok(["cat-file", "-e", a.scan_ref + ":" + WORDS_FILE])[0]
+        row("5 词表在库", (WORDS_FILE + " 存在于 " + sref) if deny_here else ("不在 " + sref + " 的树里"),
+            RED if deny_here else GREEN)
+        n, items = scan_history(repo, words, rev=a.scan_ref)
+        ncommits = len(repo.ok(["rev-list", a.scan_ref])[1].split())
+        row("9 历史命中", str(n) + " 处（" + sref + " 的 " + str(ncommits) + " 个提交）", GREEN if n == 0 else RED)
+        for path, ln, text, commits in items:
+            row("", path + ":" + str(ln) + " " + text + " @ " + ",".join(commits), RED)
+        return report(rows, str(a.repo), sref)
 
     # 1 工作区
     _, st = repo.ok(["status", "--porcelain"])
