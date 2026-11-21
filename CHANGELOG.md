@@ -11,6 +11,30 @@
 备链是**源码包**（下下来自己跑 `packaging/_pack.py` 打包），实测 0.53s，比任何镜像都快。某个域名抽风时不至于断。
 主链不通时先给人备链，**别让人卡在「下不到」这一步**——2026-11-17 就卡过一次。
 
+## v0.5.5 · 2026-11-21
+
+### 对你有影响
+
+1. 解压即可跑测试，不再要求 git
+2. 发版才需要仓库地址，可用环境变量给
+3. 包里不带任何远端配置
+
+### 没动什么
+
+- 门禁一条没改。改的是「一 import 就去找 origin」这件事——现在只有真要发版时才找。
+
+### 内部（用户不用看）
+
+<details>
+<summary>展开</summary>
+
+- **事故**：0.5.4 解压到没有 `.git` 的目录，`import tools/release.py` 直接 `SystemExit`；`tests/test_release.py` 在收集阶段装载它，于是 pytest 一条都跑不起来，人被逼着 `git init`
+- **改法**：`repo_slug()` 读不到 origin 返回空串不退出；`owner_repo()` 用到才读，优先级 `SECOND_TAKE_OWNER` > origin；`build_latest` 里 owner 为空抛 `Bad`（退出 2）并说清怎么给
+- **测试**：样例 URL 换 `example.com`，加 autouse 夹具钉住 owner，补三条用例（33 → 36）
+- **没动**：`_gate.py` 的安装检查与 rc 3 语义（干净解压本就是 rc 2，实测见 §9 v3.12）
+
+</details>
+
 ## v0.5.4 · 2026-11-21
 
 ### 对你有影响

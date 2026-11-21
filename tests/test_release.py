@@ -15,6 +15,12 @@ release = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(release)
 
 
+@pytest.fixture(autouse=True)
+def _fixed_owner(monkeypatch):
+    """测 URL 重写不需要真仓库：把 owner 钉死，测试与任何人的 origin 无关。"""
+    monkeypatch.setattr(release, "_OWNER_REPO", "example/second-take")
+
+
 GOOD = """# CHANGELOG
 
 ## v0.5.1 · 2026-11-22
@@ -57,9 +63,9 @@ def test_build_latest_keeps_keys_and_moves_urls():
         "channel": "stable",
         "severity": "normal",
         "min_client": "0.2.0",
-        "notes_url": "https://github.com/O2wuyanliuse/second-take/releases/tag/v0.5.0",
+        "notes_url": "https://example.com/second-take/releases/tag/v0.5.0",
         "tip": "",
-        "pack_urls": {"windows": "https://github.com/O2wuyanliuse/second-take/releases/download/v0.5.0/second-take-0.5.0-win.zip"},
+        "pack_urls": {"windows": "https://example.com/second-take/releases/download/v0.5.0/second-take-0.5.0-win.zip"},
     }
     data = release.build_latest(old, "0.5.1", "2026-11-22", "stable", "normal")
     assert data["version"] == "0.5.1"
@@ -68,3 +74,24 @@ def test_build_latest_keeps_keys_and_moves_urls():
     assert "0.5.1-win.zip" in data["pack_urls"]["windows"]
     assert data["notes_url"].endswith("/v0.5.1")
     assert old["version"] == "0.5.0", "不能就地改掉入参——dry-run 之后还要能回滚"
+
+
+def test_repo_slug_returns_empty_without_origin(monkeypatch):
+    """没有 origin 时返回空串，不是退出——解压就能用的包不能被 import 炸掉。"""
+    monkeypatch.setattr(release, "GIT", "git")
+    monkeypatch.setattr(release.subprocess, "run",
+                        lambda *a, **k: type("R", (), {"stdout": ""})())
+    assert release.repo_slug() == ""
+
+
+def test_owner_repo_empty_when_nothing_available(monkeypatch):
+    monkeypatch.setattr(release, "_OWNER_REPO", None)
+    monkeypatch.setattr(release, "repo_slug", lambda: "")
+    monkeypatch.delenv("SECOND_TAKE_OWNER", raising=False)
+    assert release.owner_repo() == ""
+
+
+def test_owner_repo_prefers_env(monkeypatch):
+    monkeypatch.setattr(release, "_OWNER_REPO", None)
+    monkeypatch.setenv("SECOND_TAKE_OWNER", "someone/else")
+    assert release.owner_repo() == "someone/else"

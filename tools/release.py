@@ -53,17 +53,27 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 GATE = ROOT / "gate" / "_gate.py"
 
 
+_OWNER_REPO = None
+
+
 def repo_slug():
-    """从 origin 推 owner/repo，不写死。仓库改名或搬家之后这里自动跟上。"""
+    """从 origin 推 owner/repo，不写死。仓库改名或搬家之后这里自动跟上。
+
+    读不到就返回空串——**这里不退出**：本文件会被测试与发布判据 import，
+    import 时退出等于「解压就能用」的包一解开就炸（0.5.4 的事故）。
+    """
     url = subprocess.run([GIT, "remote", "get-url", "origin"],
                          capture_output=True, text=True).stdout.strip()
     m = re.search(r"github\.com[:/]+([^/]+)/([^/]+?)(?:\.git)?/?$", url)
-    if not m:
-        raise SystemExit("无法从 origin 推断 owner/repo：" + (url or "(空)"))
-    return m.group(1) + "/" + m.group(2)
+    return (m.group(1) + "/" + m.group(2)) if m else ""
 
 
-OWNER_REPO = repo_slug()
+def owner_repo():
+    """用到才读一次。优先级：环境变量 SECOND_TAKE_OWNER > origin > 空串。"""
+    global _OWNER_REPO
+    if _OWNER_REPO is None:
+        _OWNER_REPO = (os.environ.get("SECOND_TAKE_OWNER") or repo_slug()).strip()
+    return _OWNER_REPO
 
 BANNED = [
     "重构", "优化", "修复若干", "底层", "架构", "性能提升",
@@ -226,7 +236,12 @@ def build_latest(old_data: dict, new: str, date: str, channel: str, severity: st
     data["date"] = date
     data["channel"] = channel
     data["severity"] = severity
-    owner = OWNER_REPO
+    owner = owner_repo()
+    if not owner:
+        raise Bad("推断不出 owner/repo：本目录没有 origin。发版时才需要它，二选一——"
+                  "①git remote add origin git@github.com:<你>/<仓库>.git；"
+                  "②设环境变量 SECOND_TAKE_OWNER=<你>/<仓库>。"
+                  "只是想跑测试、或只是想看看这个包，可以什么都不做。")
     data["notes_url"] = "https://github.com/%s/releases/tag/v%s" % (owner, new)
     packs = data.get("pack_urls") or {}
     if isinstance(packs, dict):
