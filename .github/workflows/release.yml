@@ -54,11 +54,12 @@ jobs:
           TAG="${{ github.ref_name }}"
           if [[ "$TAG" == v* ]]; then EXTRA="--expect-tag $TAG"; else EXTRA=""; fi
           set +e
-          python tools/verify_release.py --repo . --words .ci/denylist.txt --no-zip $EXTRA | tee /tmp/vr.log
-          rc=${PIPESTATUS[0]}
+          python tools/verify_release.py --repo . --words .ci/denylist.txt --no-zip $EXTRA > /tmp/vr.log 2>&1
+          rc=$?
+          cat /tmp/vr.log
           if [ "$rc" -ne 0 ]; then
-            # 报红必须说出红在哪一行——只说「exit 1」的闸，下一次没人愿意看。
-            while IFS= read -r l; do echo "::error::VR $l"; done < <(tail -n 15 /tmp/vr.log)
+            # 注解会截断，整份日志写进 job summary——报红必须能读到原因，不能只给 exit 1。
+            { echo '### 判据输出（exit '"$rc"')'; echo '```'; cat /tmp/vr.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
             exit "$rc"
           fi
 
