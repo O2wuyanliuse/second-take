@@ -14,17 +14,22 @@
 经过写在 docs/maintain/维护方法.md §9 v1.8。
 
 用法：
-    python tools/check_maintenance.py                 # 只查 HEAD 这一个提交
-    python tools/check_maintenance.py --base origin/master
+    python tools/check_maintenance.py                        # 只查 HEAD 这一个提交
+    python tools/check_maintenance.py --base HEAD~1           # 查刚做完的那一个提交
+    python tools/check_maintenance.py --base origin/master    # 查整段（两者之间没有提交时退 2，不是通过）
     python tools/check_maintenance.py --staged --message-file .git/COMMIT_EDITMSG
 
-退出码：0 通过 ／ 1 有提交触犯（或这一步没查成——**没查成不算通过**）
+退出码：0 通过 ／ 1 有提交触犯 ／ 2 没查成（空范围、git 失败）——**2 不是通过**
 """
 
 import argparse
 import re
 import subprocess
 import sys
+
+# 中文输出在 GBK 控制台会乱码；本仓库 2026-11-06 在门禁的 ✅ 上踩过一次，这次补在日志上。
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 PROTECTED = ("scripts/", "gate/", "packaging/", ".github/", "tools/")
 DOC = "docs/maintain/维护方法.md"
@@ -34,14 +39,18 @@ TAG_RE = re.compile(r"\[no-procedure-change[:：][^\]\n]{2,}\]")
 def die(msg):
     print("[check] ⛔ " + msg, file=sys.stderr)
     print("[check] 这一步没查成 —— **不算通过**。", file=sys.stderr)
-    raise SystemExit(1)
+    raise SystemExit(2)
 
 
 def git(*args):
-    r = subprocess.run(
-        ["git", "-c", "core.quotepath=false"] + list(args),
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-    )
+    try:
+        r = subprocess.run(
+            ["git", "-c", "core.quotepath=false"] + list(args),
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+    except FileNotFoundError:
+        # git 不在 PATH：这是「没查成」，不是「有提交触犯」。别让它以 traceback 退 1 冒充红。
+        die("找不到 git 命令，无法判断提交")
     if r.returncode != 0:
         die("git %s 失败：%s" % (" ".join(args), (r.stderr or "").strip()[:300]))
     return r.stdout
@@ -125,8 +134,12 @@ def main():
     if args.base:
         shas = git("rev-list", "--reverse", "%s..HEAD" % args.base).split()
         if not shas:
-            print("[check] 基准 %s 与 HEAD 之间没有提交，通过。" % args.base)
-            return 0
+            print("[check] ⛔ 基准 %s 与 HEAD 之间没有提交 —— 这一步没查成，**不算通过**。" % args.base,
+                  file=sys.stderr)
+            print("[check] 判刚做完的那一个提交：--base HEAD~1；判整段：--base <更早的提交>。", file=sys.stderr)
+            print("[check] CI 里没有可比基准时**不调这个脚本**（ci.yml 打「本步不判」再跳过）——跳过不是通过。",
+                  file=sys.stderr)
+            return 2
         rows = []
         for sha in shas:
             bad = verdict(files_of_commit(sha), git("log", "-1", "--format=%B", sha))

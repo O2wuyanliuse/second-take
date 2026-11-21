@@ -68,3 +68,23 @@ def test_staged_mode_reads_message_file(sandbox):
     msg.write_text("改工具\n\n[no-procedure-change: 只改实现]\n", encoding="utf-8")
     r2 = run(sandbox, "tools/check_maintenance.py", "--staged", "--message-file", str(msg))
     assert r2.returncode == 0, r2.stdout
+
+
+def test_empty_range_is_not_a_pass(sandbox):
+    """空范围＝没查成，不是通过：--base HEAD 必须退 2。"""
+    checker(sandbox)
+    write(sandbox, "gate/_gate.py", "# 改流程\n")
+    commit(sandbox, "改门禁（没写文档）")
+    r = run(sandbox, "tools/check_maintenance.py", "--base", "HEAD")
+    assert r.returncode == 2, r.stdout
+    assert "没查成" in r.stderr
+
+
+def test_empty_range_is_not_a_pass(sandbox):
+    """空范围＝没查成，不是通过：--base HEAD 必须退 2。"""
+    checker(sandbox)
+    write(sandbox, "gate/_gate.py", "# 改流程\n")
+    commit(sandbox, "改门禁（没写文档）")
+    r = run(sandbox, "tools/check_maintenance.py", "--base", "HEAD")
+    assert r.returncode == 2, r.stdout
+    assert "没查成" in r.stderr
