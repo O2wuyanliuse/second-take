@@ -1,23 +1,85 @@
 #!/bin/sh
-# 推前：再查一遍（`pre-commit` 可被 `--no-verify` 绕过，这一层补上）
+# second-take 推送前强制核验（第二重保险）
+# 装法：git config core.hooksPath .githooks   （bootstrap.py 会顺手设）
 #
-# 严格做法是只扫「本次要推的范围」，但 `_leakscan` 是按仓库扫的，没有范围参数。
-# 当前树这一层已经能挡住「我改完忘了清」；历史里有没有，由发布前那一遍
-# `--deny … --strict`（全量 blob）兜。
-#
-# ⚠ 本库退出码约定：0 绿 ／ 1 阻断 ／ 2 提示。2 不算红。
+# 规矩：**核不了就不许推**。找不到解释器、找不到核验脚本，都按红处理——
+# 否则「把脚本删掉」就成了绕过方式。
+set -u
 
-echo "[pre-push] 脱敏（公库禁用词，只看当前树）…"
-python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+cd "$repo_root" || exit 1
+
+find_py() {
+  if [ -n "${SECOND_TAKE_PYTHON:-}" ] && [ -x "${SECOND_TAKE_PYTHON}" ]; then
+    echo "${SECOND_TAKE_PYTHON}"; return 0
+  fi
+  if [ -f .git/second-take-python ]; then
+    p=$(cat .git/second-take-python 2>/dev/null)
+    if [ -n "$p" ] && [ -x "$p" ]; then echo "$p"; return 0; fi
+  fi
+  for c in python3 python py; do
+    if command -v "$c" >/dev/null 2>&1; then echo "$c"; return 0; fi
+  done
+  echo ""
+}
+
+PY=$(find_py)
+if [ -z "$PY" ]; then
+  echo ""
+  echo "[blocked] 找不到 python，无法核验 → 拒绝推送。"
+  echo "  装 python，或把解释器路径写进 .git/second-take-python"
+  echo "  （或设环境变量 SECOND_TAKE_PYTHON）。"
+  exit 1
+fi
+
+TOOL="tools/verify_release.py"
+if [ ! -f "$TOOL" ]; then
+  echo ""
+  echo "[blocked] 缺少 $TOOL，无法核验 → 拒绝推送。"
+  echo "  这不是「跳过」，是配置坏了：删掉脚本不能成为绕过方式。"
+  exit 1
+fi
+
+echo ""
+echo "== 推送前核验（tools/verify_release.py）=="
+"$PY" -X utf8 "$TOOL" --no-zip --no-history
 rc=$?
-if [ "$rc" -eq 1 ]; then
-    echo "[pre-push] 有命中 —— 不推。清完再来。" >&2
-    exit 1
-fi
-if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
-    echo "[pre-push] 没查成（退出码 $rc）—— **不算通过**，别推。" >&2
-    exit "$rc"
+if [ "$rc" -ne 0 ]; then
+  echo ""
+  echo "[blocked] 核验未通过（退出码 $rc）→ 拒绝推送。"
+  echo "  绿才推。红了就改，不要改这个钩子。"
+  exit 1
 fi
 
-echo "[pre-push] 通过。真要发版，记得另外跑一遍全历史："
-echo "  python packaging/_leakscan.py --deny packaging/public_denylist.txt --strict"
+# 推 tag 时额外要求：包必须有封条，且封条对得上
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/v*)
+      ver=$(echo "$remote_ref" | sed "s#refs/tags/v##")
+      zip="${SECOND_TAKE_ZIP:-../second-take-$ver-win.zip}"
+      if [ ! -f "$zip" ]; then
+        echo ""
+        echo "[blocked] 要推 $remote_ref，但找不到包：$zip"
+        echo "  先打包装封（build_public_package.py → seal.py seal），再推 tag。"
+        exit 1
+      fi
+      if [ ! -f "$zip.seal.json" ]; then
+        echo ""
+        echo "[blocked] 包没有封条：$zip.seal.json"
+        echo "  无封条的包不许发。"
+        exit 1
+      fi
+      echo "== tag $remote_ref 的封条核验 =="
+      "$PY" -X utf8 tools/seal.py check "$zip"
+      if [ $? -ne 0 ]; then
+        echo ""
+        echo "[blocked] 封条对不上 → 拒绝推 tag。"
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+echo ""
+echo "[ok] 核验通过，放行。"
+exit 0

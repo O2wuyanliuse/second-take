@@ -1,0 +1,125 @@
+# 发布闸门 · 草稿（给 WB 落成 .github/workflows/release.yml）
+#
+# 设计原则：人不需要记得检查——没有绿，就产不出包、发不了 release。
+#   1) 词表不进仓库：从仓库 secret PUBLIC_DENYLIST 注入临时文件（.ci/ 已在 .gitignore）
+#   2) 判据只有一份代码：tools/verify_release.py（本地双击与 CI 跑的是同一个文件）
+#   3) 包只能由 CI 打：tools/build_public_package.py 按 publish_manifest.txt 白名单打包
+#   4) 扫不过 → zip 当场删除；因此「没扫过的包」在物理上不存在
+#   5) release 与资产都由此 workflow 创建：网页上能下载的东西只有这一个来源
+name: release
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: 判据
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 历史扫描要全历史
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 词表从 secret 注入（不进仓库）
+        shell: bash
+        run: |
+          mkdir -p .ci
+          printf "%s" "${{ secrets.PUBLIC_DENYLIST }}" > .ci/denylist.txt
+          test -s .ci/denylist.txt || { echo "::error::仓库 secret PUBLIC_DENYLIST 为空"; exit 1; }
+      - name: 启动契约自检
+        run: python tools/bootstrap.py --check
+      - name: 门禁
+        run: |
+          set +e
+          python gate/_gate.py
+          rc=$?
+          echo "gate rc=$rc"
+          [ "$rc" = "1" ] && exit 1
+          exit 0
+      - name: 发布判据（树 + 历史 + tag）
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" == v* ]]; then EXTRA="--expect-tag $TAG"; else EXTRA=""; fi
+          python tools/verify_release.py --repo . --words .ci/denylist.txt --no-zip $EXTRA
+
+  build:
+    name: 打包
+    needs: check
+    if: startsWith(github.ref, "refs/tags/v")
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 词表从 secret 注入
+        shell: bash
+        run: |
+          mkdir -p .ci
+          printf "%s" "${{ secrets.PUBLIC_DENYLIST }}" > .ci/denylist.txt
+      - name: 版本与 tag 对账（资产名不许含糊）
+        shell: bash
+        run: |
+          ver=$(python -c "print(open('VERSION',encoding='utf-8').read().split('·')[0].strip())")
+          echo "VER=$ver" >> "$GITHUB_ENV"
+          if [ "v$ver" != "${{ github.ref_name }}" ]; then
+            echo "::error::VERSION($ver) 与 tag(${{ github.ref_name }}) 不一致"; exit 1
+          fi
+      - name: 白名单打包（扫不过会自删）
+        shell: bash
+        run: |
+          mkdir -p dist
+          python tools/build_public_package.py --repo . --words .ci/denylist.txt \
+            --out "dist/second-take-$VER-win.zip"
+      - name: 封条（上传后回读对比用）
+        shell: bash
+        run: python tools/seal.py seal "dist/second-take-$VER-win.zip" --repo . --words .ci/denylist.txt
+      - name: 生成 SHA256SUMS
+        shell: bash
+        run: cd dist && sha256sum *.zip > SHA256SUMS && cat SHA256SUMS && cat *.seal.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: 建 release 并上传（tag 已存在，--verify-tag 挡住现建）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            dist/*.zip dist/SHA256SUMS dist/*.seal.json \
+            --verify-tag \
+            --title "${{ github.ref_name }}" \
+            --notes "见 CHANGELOG.md（$(date -u +%Y-%m-%d)）"
+
+# 还必须在 GitHub 设置里做（网页操作，脚本管不到）：
+#   Settings → Rules → Rulesets → New branch ruleset（target: master）
+#     ☑ Require status checks to pass（勾 check）
+#     ☑ Block force pushes
+#     ☑ Do not allow bypassing the above settings
+#   Settings → Actions → General → Workflow permissions: Read and write
+#   Settings → Secrets and variables → Actions → New secret: PUBLIC_DENYLIST（多行：一行一个词）

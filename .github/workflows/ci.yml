@@ -47,11 +47,18 @@ jobs:
           echo "门禁退出码 $rc（2＝提示档，不是红）"
       - name: ④ 断链（文档里写的路径真的存在）
         run: python gate/_links.py
-      # ⑤ 用公库自带的禁用词表，**不借私库词表**——那正是它能进 CI 的原因。
-      #    `--no-history`：CI 只看当前树。历史是全量 blob 扫描，属发布前动作
-      #    （`--deny ... --strict` 在本地跑），也免得每次 push 都扫 90 个提交。
-      - name: ⑤ 脱敏（公库自带禁用词，只看当前树）
-        run: python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
+      # ⑤ 词表**不在仓库里**（它必须写出要禁的词，留在库里等于自泄一次）。
+      #    CI 从仓库 secret 注入到 .ci/（已 gitignore）；secret 空＝这一项没查成，判红。
+      - name: ⑤ 脱敏（词表从 secret 注入，只看当前树）
+        shell: bash
+        run: |
+          mkdir -p .ci
+          printf "%s" "${{ secrets.PUBLIC_DENYLIST }}" > .ci/denylist.txt
+          if [ ! -s .ci/denylist.txt ]; then
+            echo "::error::secret PUBLIC_DENYLIST 为空——脱敏这一项没查成，不算通过"
+            exit 1
+          fi
+          python packaging/_leakscan.py --words .ci/denylist.txt --no-history
       # ⑥ 比较基准必须是「推送前那个提交」，不能用 origin/master：
       # push 到 master 时 origin/master 就是刚推的 HEAD，diff 恒为空——那是个永远绿的假检查。
       - name: ⑥ 维护方法双写

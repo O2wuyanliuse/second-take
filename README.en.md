@@ -47,8 +47,10 @@ No trust required — three commands:
 ```bash
 python packaging/_doctor.py                                            # which side am I on? what's missing?
 python packaging/_triage.py .                                          # structural signals: secrets, local paths
-python packaging/_leakscan.py --deny packaging/public_denylist.txt     # this repo's own denylist, history included
+python packaging/_leakscan.py --words <your_wordlist.txt>              # scan with YOUR wordlist, history included
 ```
+
+**This repository ships no wordlist.** A denylist has to spell out the words it bans, so keeping one in the repo leaks them once by definition — it was moved out on 2026-11-21 (CI injects it from a repository secret; locally you pass `--words`).
 
 On a fresh clone the last two return exit code **2**. That is **"not checked"**, not "clean": wordlists belong to your project, not to this library. The scanner refuses to give you a green it didn't earn.
 

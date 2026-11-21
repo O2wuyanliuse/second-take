@@ -46,3 +46,6 @@ config.local.json
 
 # pytest 缓存（用例在 tests/，缓存不进库）
 .pytest_cache/
+
+# CI / 本地注入的禁用词表（不进仓库）
+.ci/

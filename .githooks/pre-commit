@@ -24,6 +24,12 @@ echo "[pre-commit] 门禁 …"
 run python gate/_gate.py
 echo "[pre-commit] 断链 …"
 run python gate/_links.py
-echo "[pre-commit] 脱敏（公库禁用词，只看当前树）…"
-run python packaging/_leakscan.py --deny packaging/public_denylist.txt --no-history
+# 词表 2026-11-21 起不在仓库里（它必须写出要禁的词）。有 .ci/denylist.txt 就扫，没有就明说跳过——
+# 静默跳过等于假装查过，所以这一行必须打印出来。
+if [ -s .ci/denylist.txt ]; then
+    echo "[pre-commit] 脱敏（.ci/denylist.txt，只看当前树）…"
+    run python packaging/_leakscan.py --words .ci/denylist.txt --no-history
+else
+    echo "[pre-commit] 脱敏：跳过（本机没有 .ci/denylist.txt）——**这一项没查**，发布前由 tools/verify_release.py 兜"
+fi
 echo "[pre-commit] 通过。"

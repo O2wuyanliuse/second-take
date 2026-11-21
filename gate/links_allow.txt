@@ -11,3 +11,10 @@ README.md → packaging/脱敏补充词.txt = 教读者「拿它做自己的项�
 skills/ai-video-pipeline/SKILL.md → Agent框架/[台账]跟进通道.md = 教读者「欠账、进度记哪儿」，指他项目里的台账；本仓库不带台账，也不该带
 Agent框架/01_规则层_叙事纪律.md → [项目]文笔样本库 = 通用层在说「你项目里该有这么一份库」，本库不带项目实例；带走后按这句话自己建
 Agent框架/同步防断_v1.md → [台账]抽卡记录 = 同上：讲的是「每个项目要有抽卡台账」这条规矩，不是承诺本库有那份文件
+
+# 2026-11-21 v2.5：两份词表已移出仓库（搬去 secret 与私库）并重写历史。
+# 下列是**历史条目里记的当时路径**，不是现在该存在的文件——断链是事实，不是错。
+CHANGELOG.md→packaging/public_denylist.txt = v2.5 已删；这里记 0.5.0 当时的做法
+CHANGELOG.md→packaging/leak_known_history.txt = v2.5 已删；这里记 0.5.0 当时的做法
+docs/maintain/维护方法.md→packaging/public_denylist.txt = v2.5 已删；只在 §9 历史条目里被引用
+docs/maintain/维护方法.md→packaging/leak_known_history.txt = v2.5 已删；只在 §9 历史条目里被引用
