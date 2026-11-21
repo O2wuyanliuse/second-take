@@ -29,7 +29,13 @@ jobs:
       - name: ⓪ latest.json 的地址要对上当前仓库
         shell: bash
         run: |
-          slug=$(git remote get-url origin | sed -E "s#.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$#\1#")
+          # 不用非贪婪量词（[^/]+?）：GNU sed 的 ERE 不认，会直接报错退出，slug 变成空串。
+          url=$(git remote get-url origin)
+          slug=$(echo "$url" | sed -E 's#.*github\.com[:/]([^/]+)/([^/]+)$#\1/\2#; s#\.git$##')
+          if [ -z "$slug" ]; then
+            echo "::error::推断不出 owner/repo：$url"
+            exit 1
+          fi
           echo "slug=$slug"
           grep -q "github.com/$slug/" latest.json || { echo "::error::latest.json 指向的不是 $slug"; exit 1; }
       - name: ① ruff（只开真错：F + E9）
