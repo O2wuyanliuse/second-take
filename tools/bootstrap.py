@@ -136,10 +136,19 @@ def wire_hooks():
     if rc != 0 or not cur:
         rc2, _ = git_out("config", "--local", "core.hooksPath", ".githooks")
         if rc2 == 0:
+            try:
+                (REPO / ".git" / "second-take-python").write_text(sys.executable, encoding="utf-8")
+            except OSError:
+                pass
             say("[4/6] 钩子已接: core.hooksPath → .githooks（本机配置, 不进仓库）")
         else:
             say("[提示] 钩子没接上（git config 失败）。手动跑: git config core.hooksPath .githooks")
         return
+    # pre-push 要找一个能跑的 python：把当前解释器路径记在本机（不进仓库）。
+    try:
+        (REPO / ".git" / "second-take-python").write_text(sys.executable, encoding="utf-8")
+    except OSError:
+        pass
     if cur.replace("\\", "/").rstrip("/") in (".githooks", str(REPO / ".githooks").replace("\\", "/")):
         say("[4/6] 钩子已指向 .githooks, 不动。")
         return
