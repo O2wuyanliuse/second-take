@@ -1,5 +1,7 @@
 # second-take
 
+> **Chinese version (complete):** [README.md](README.md) — the Chinese text is the normative one; this English page is a full translation of it.
+
 **A method layer that turns a long story into shootable shots — and every shot into a reproducible prompt.**
 
 Not a prompt collection. What it gives you is criteria, gates and ledgers: every step has a pass/fail judgement, and when something comes out wrong you can see which step stopped.

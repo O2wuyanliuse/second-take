@@ -147,6 +147,7 @@ tools/_mkview_flow.py
 tools/asset_measure.py
 tools/bootstrap.py
 tools/build_public_package.py
+tools/check_bilingual.py
 tools/check_maintenance.py
 tools/jimeng_bench/server.py
 tools/jimeng_bench/ui/index.html

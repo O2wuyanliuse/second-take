@@ -1,5 +1,7 @@
 # AGENTS.md —— 给 AI 的入口
 
+> **English (for AI agents):** This file is written for the AI reading this repository. Rules: do not create files to make a gate green — a red that means "not built yet" must be reported as such, not patched over. Ask before touching anything outside the workspace. The Chinese text below is normative.
+
 > **这份文件是给「读这个仓库的 AI」看的，不是给人看的**；人看 `README.md`。
 > **层**：通用层。换项目可整份带走。
 

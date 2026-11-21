@@ -89,6 +89,9 @@ jobs:
             exit 0
           fi
           python tools/check_maintenance.py --base "$BASE"
+      # 文档说要、机器不查，等于没说：对外文档必须带英文摘要（只查有没有，质量归 review）。
+      - name: ⑥b 双语（对外文档有没有英文摘要）
+        run: python tools/check_bilingual.py
       # ⑦ 用例测的是「检查器还有没有牙」：无词表给不给绿、断链报不报、双写会不会被
       #    下一条提交的免责标签顶掉。改判据的人先在这里红，别等发布那天红。
       - name: ⑦ 用例（32 条，测本库的检查器）

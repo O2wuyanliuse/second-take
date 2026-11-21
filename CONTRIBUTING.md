@@ -1,5 +1,12 @@
 # 贡献说明
 
+> **English summary:** The maintainer is not an engineer — these rules grew out of practice and the code was written by an AI assistant, so this guide is about what a non-engineer can verify, not about pretty pull requests.
+> Submitting a PR grants a dual licence: **code** (`*.py`, scripts, CI) under **Apache-2.0**; **docs and methodology** (`*.md`, images, prompt templates) under **CC BY-SA 4.0**; and you allow the maintainer to **re-licence your contribution under other terms** (needed only if a licences exception is ever granted to someone).
+> Scope: methodology and tooling only — no novel text, no character names, no media files, no links to private repositories.
+> Touching `gate/`, `packaging/`, `tools/` or `.github/` requires updating §9 of `docs/maintain/维护方法.md` **in the same commit**, or writing `[no-procedure-change: reason]` in the message.
+> Hard rule: a PR that changes `packaging/*.py` must stay **≤50 lines**. Not because your code is bad, but because the maintainer cannot review more — and unreviewed code is worse than no code.
+> The Chinese body below is the normative text; this summary restates everything that decides whether your PR gets merged.
+
 > **先说一句实话：维护者不是工程师。** 这里的规范和判据是作者在实践中一条条长出来的，
 > 代码是 AI 助手写的。所以这份指南的重点不是「怎么写漂亮的 PR」，
 > 而是**怎么让一个不读代码的人也能判断你的改动该不该收**。
