@@ -42,7 +42,18 @@ fi
 
 echo ""
 echo "== 推送前核验（tools/verify_release.py）=="
-"$PY" -X utf8 "$TOOL" --no-zip --no-history
+# 词表不在仓库里（2026-11-21 搬出）：本地从 SECOND_TAKE_WORDS 或 .ci/denylist.txt 取。
+# 两处都没有 → 核不了，按拒绝推送处理——**不许静默降级成「跳过」**。
+WORDS="${SECOND_TAKE_WORDS:-.ci/denylist.txt}"
+if [ ! -s "$WORDS" ]; then
+  echo ""
+  echo "[blocked] 找不到词表：$WORDS"
+  echo "  设 SECOND_TAKE_WORDS=<私库词表>，或把它放到 .ci/denylist.txt（已 gitignore）。"
+  echo "  没有词表就核不了——核不了不许推。"
+  exit 1
+fi
+# 历史一起扫：只扫当前树等于放过「改文件但旧提交还在」那一半。
+"$PY" -X utf8 "$TOOL" --no-zip --words "$WORDS"
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo ""
