@@ -5,7 +5,7 @@ r"""second-take 启动自检/初始化。
 用法:
     python tools/bootstrap.py            # 初始化: 缺什么建什么, 已存在不动
     python tools/bootstrap.py --check    # 只检查, 不写盘; 退出码 0 = 环境合格
-    python tools/bootstrap.py --root D:\somewhere\workspace
+    python tools/bootstrap.py --root /some/where/workspace
 
 路径优先级: --root > 环境变量 SECOND_TAKE_HOME > config.local.json 的 workspace_root > 仓库内 workspace/
 原则: 不假设任何目录存在; 缺了就建; 建了什么要说出来。

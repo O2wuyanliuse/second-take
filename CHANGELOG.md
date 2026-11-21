@@ -11,30 +11,31 @@
 备链是**源码包**（下下来自己跑 `packaging/_pack.py` 打包），实测 0.53s，比任何镜像都快。某个域名抽风时不至于断。
 主链不通时先给人备链，**别让人卡在「下不到」这一步**——2026-11-17 就卡过一次。
 
-## v0.4.4 · 2026-11-21
+## v0.5.0 · 2026-11-21
 
 ### 对你有影响
 
-1. 包里不再出现任何本机工具名
-2. 缓存目录名改成自己配：`GATE_IGNORE_DIRS`
+1. 新库首发：历史清零，只有一条快照
+2. 包里不再出现任何本机工具名
+3. clone 后先跑 bootstrap 自检
 
 ### 没动什么
 
-- 判据一条没改，19 项的适用面也不变。改的是「扫描时跳过哪些目录」的来源：从写死的名字变成读配置——默认什么都不跳，行为与以前一致。
+- 判据一条没改，19 项的适用面也不变。改的是三件事：扫描时跳过哪些目录（从写死的名字变成读配置）、入口怎么描述第一步（启动契约）、维护方法放在哪（搬进本库）。
 
 ### 内部（用户不用看）
 
 <details>
 <summary>展开</summary>
 
-- **这一版是「新库首发」**：旧库改名 `second-take-archive` 转 Private，原样封存（**91 提交／5 tag／每版 zip**）；本库是零历史的干净起点。旧地址 302 到归档名，旧资产对匿名者失效——所以**这一版必须发**，否则所有老客户端升级会 404
-- `gate/_ignore.py`（新增）：忽略目录的唯一来源（内置中性集 ＋ `gate_profile.json` 的「忽略目录」＋ 环境变量 `GATE_IGNORE_DIRS`）。`_links`／`_redline`／`_orphan` 三处硬编码集合改为读它
-- `_orphan.py` 的 `SKIP_DIRS` 顺带清掉四个私库目录名（`_原始归档`／`备份`／`_沙盒_E0测试`／`存证`）
-- 文案中性化：`_triage` 正则删掉工具目录段；`_orphan`／`_redline` 的注释与 `[scope]` 改用「缓存目录」；`leak_allow.txt` 删掉工具名那条豁免
-- `packaging/public_denylist.txt`（新增）＋ `_leakscan.py` 的 `--deny`／`--strict`：公库自带禁用词，**不借私库词表**，所以能进 CI
-- CI 加第 ④ 步 `--deny … --no-history`；`.githooks/pre-commit`／`pre-push` 同口径（钩子可被 `--no-verify` 绕过，CI 是第二层）
-- 删陈旧分支 `sync-1117`（0 独有提交／19 behind）
-- 验收：`git grep -in <工具名> HEAD -- ':!packaging/public_denylist.txt'` 无输出（词表自身必须写出它禁的词，是定义不是漏检）；ruff 全过；门禁 19 项阻断 0
+- **新库首发**：旧库改名 `second-take-archive` 转 Private，原样封存（**91 提交／5 个 tag／每版 zip**）；本库从零历史起步。旧地址 302 到归档名，旧资产对匿名者失效——所以这一版必须发
+- **启动契约**：`tools/bootstrap.py` 五步幂等（探测 → 建 `workspace/{input,output,cache}` → 生成 `config.local.json` → 跑最小门禁 → 打印下一步）；路径优先级 `--root` > `SECOND_TAKE_HOME` > `config.local.json` > 仓库内 `workspace/`
+- **维护方法入公库**：`docs/maintain/维护方法.md`——坑 1–13、发版五步、边界、回执、§9 变更记录；全文零盘符零用户名，拷到别的机器能单独读
+- **双写机器强制**：`tools/check_maintenance.py`——改了 `gate/`／`packaging/`／`tools/`／`.github/` 就必须同步改维护方法，否则提交信息要带 `[no-procedure-change: 理由]`。接进 CI 第 ⑥ 步与 `commit-msg` 钩子
+- **工具名清零**：`gate/_ignore.py`（忽略目录唯一来源）、`packaging/public_denylist.txt`（公库自带禁用词，能进 CI）、`_leakscan.py` 的 `--deny`／`--strict`；`_orphan.py` 清掉四个私库目录名；`_triage` 正则删掉工具目录段
+- **CI 从四步到六步**：加 ② 启动自检（干净机器先建再验）与 ⑥ 双写
+- `_links.py`：阻断项改为**永远指名**（原来只在 `--each` 时打详情，报红却点不出位置）
+- 验收：`git grep -in <工具名> HEAD -- ':!packaging/public_denylist.txt'` 无输出（词表自身必须写出它禁的词，是定义不是漏检）；`bootstrap --check` 退出 0；ruff 全过；门禁 19 项阻断 0
 
 </details>
 
