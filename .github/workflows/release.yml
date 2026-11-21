@@ -49,10 +49,18 @@ jobs:
           [ "$rc" = "1" ] && exit 1
           exit 0
       - name: 发布判据（树 + 历史 + tag）
+        shell: bash
         run: |
           TAG="${{ github.ref_name }}"
           if [[ "$TAG" == v* ]]; then EXTRA="--expect-tag $TAG"; else EXTRA=""; fi
-          python tools/verify_release.py --repo . --words .ci/denylist.txt --no-zip $EXTRA
+          set +e
+          python tools/verify_release.py --repo . --words .ci/denylist.txt --no-zip $EXTRA | tee /tmp/vr.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            # 报红必须说出红在哪一行——只说「exit 1」的闸，下一次没人愿意看。
+            while IFS= read -r l; do echo "::error::VR $l"; done < <(tail -n 15 /tmp/vr.log)
+            exit "$rc"
+          fi
 
   build:
     name: 打包
