@@ -14,7 +14,6 @@ r"""second-take 启动自检/初始化。
 import argparse
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -195,45 +194,27 @@ def run_init(root):
 
     wire_hooks()
 
-    gate = REPO / "gate" / "_gate.py"
-    gate_bad = ""
-    if gate.exists():
-        say("[5/6] 体检预览：跑一次门禁（只看不拦，不影响启动）...")
+    say("[5/6] 现状：")
+    try:
+        import status as _status          # 同目录的 tools/status.py
+
+        lines = _status.render(REPO)
+        for ln in lines:
+            say("  " + ln)
         try:
-            r = subprocess.run(
-                [sys.executable, str(gate)],
-                cwd=str(REPO),
-                capture_output=True,
-                timeout=180,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            out = (r.stdout or "").strip()
-            say(out or "(门禁无输出)")
-            if r.returncode != 0:
-                m = re.search(r"阻断\s*(\d+)", out)
-                n = m.group(1) if m else ""
-                # 门禁退出码 2 是「提示档」，此时阻断数是 0——那一行不该出现。
-                if n and n != "0":
-                    gate_bad = n
-                elif r.returncode == 1 and not n:
-                    gate_bad = "若干"
-        except Exception as e:
-            say("[注意] 门禁没跑起来 (%s), 跳过。" % e)
-    else:
-        say("[5/6] 本仓库没有 gate/_gate.py, 跳过门禁。")
+            _status.write_report(REPO, lines)
+            say("  （以上同时写进 workspace/开工报告.md，之后随时可再看）")
+        except Exception:
+            pass
+    except Exception as e:
+        say("  (状态页没跑起来: %s)" % e)
 
     if not git_ignores_workspace() and (REPO / ".git").exists():
         say("[提醒] .gitignore 里还没有 workspace/, 建议加一行, 免得把用户材料提交上去。")
 
-    say("[6/6] 下一步:")
-    say("  python tools/bootstrap.py --check")
-    say("  (然后按 README 的三条命令走到第一格)")
     say("")
-    say("结论: 环境就绪（可以开工）。")
-    if gate_bad:
-        say("门禁: 有 %s 项阻断（与启动无关），开工前照上面那条处理。" % gate_bad)
+    say("[6/6] 结论: 环境就绪（可以开工）。")
+    say("随时可查: python tools/status.py")
     return 0
 
 

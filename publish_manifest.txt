@@ -143,6 +143,7 @@ tests/test_leakscan.py
 tests/test_links.py
 tests/test_maintenance.py
 tests/test_release.py
+tests/test_status.py
 tools/_keyout.py
 tools/_mkview.py
 tools/_mkview_flow.py
@@ -157,6 +158,7 @@ tools/jimeng_bench/server.py
 tools/jimeng_bench/ui/index.html
 tools/release.py
 tools/seal.py
+tools/status.py
 tools/verify_release.py
 剪辑引导.md
 发布前检查清单.md
