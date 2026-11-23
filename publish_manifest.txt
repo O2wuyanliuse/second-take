@@ -87,7 +87,6 @@ packaging/_sync_check.py
 packaging/_triage.py
 packaging/_verify_package.py
 packaging/leak_allow.txt
-packaging/leak_known_history.txt
 packaging/templates/gitignore
 packaging/templates/从这里开始.txt
 packaging/templates/使用说明.txt

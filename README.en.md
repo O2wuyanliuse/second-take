@@ -37,6 +37,8 @@ Exit code `0` means the environment is ready. Anything else prints exactly what 
 
 **On a fresh clone the first command is `bootstrap.py` (create), not `--check` (inspect).** `--check` first always fails on a clean machine — that is "not built yet", not "broken".
 
+`pytest` is optional: without it you can still start, but the "tests" row in `tools/evidence.py` will read "not run". To cover all three rows: `python -m pip install pytest`.
+
 Then open `开工提示词.md` (Chinese) and paste that block into your AI assistant — it asks you three questions (where the source is / what genre / how it relates to the original), then takes you to your first frame. You don't need to read anything else before that.
 
 ## What you don't need
@@ -54,8 +56,7 @@ Then open `开工提示词.md` (Chinese) and paste that block into your AI assis
 | `shapes/` | Empty criteria / step / handoff forms. Take one, fill it with your own rules |
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
 | `packaging/` | Packing and de-identification: leak scan, duplicate check, package verify |
-| `tools/` | Batch panel, asset measurement, bootstrap, release; health check `tools/doctor.py` |
-| `tools/evidence.py` | One command runs self-check / gate / tests and writes exit codes and timings to an evidence page (`evidence.md` under `reports/`, git-ignored) |
+| `tools/` | Batch panel, asset measurement, bootstrap, release; `doctor.py` for a health check, `evidence.py` to turn exit codes into a one-page proof (`reports/`, git-ignored) |
 | `tests/` | The checkers' own test suite — `python -m pytest -q` |
 
 ## Three premises

@@ -19,6 +19,7 @@
 """
 
 import argparse
+import importlib.util
 import json
 import subprocess
 import sys
@@ -42,6 +43,33 @@ def git(*args):
         return r.stdout.strip() if r.returncode == 0 else ""
     except OSError:
         return ""
+
+
+def pytest_available():
+    """pytest 在不在。不在不是故障——只是证据页的「用例」会记跳过。"""
+    try:
+        return importlib.util.find_spec("pytest") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def last_evidence(root):
+    """(结论, 证据里的 HEAD 短哈希)。没跑过就是 ("", "")。
+
+    **不校验新鲜度，这一行就是骗人的**：昨天跑出的「通过」，今天改完代码还会显示通过。
+    """
+    ev = root / "reports" / "evidence.md"
+    if not ev.exists():
+        return "", ""
+    concl, head_in = "", ""
+    for ln in ev.read_text(encoding="utf-8", errors="replace").splitlines():
+        if ln.startswith("- 结论："):
+            concl = ln.split("**")[1] if "**" in ln else ln[len("- 结论："):]
+        elif ln.startswith("# 证据 ·"):
+            parts = [p.strip() for p in ln.split("·")]
+            if len(parts) >= 4:
+                head_in = parts[2]
+    return concl, head_in
 
 
 def dir_stats(path):
@@ -78,8 +106,11 @@ def six_lines(root):
 
     v = "%d.%d.%d" % sys.version_info[:3]
     ok_py = sys.version_info[:2] >= MIN_PY
-    out.append("[1/6] python   %s %s %d.%d%s" % (
-        v, "≥" if ok_py else "<", MIN_PY[0], MIN_PY[1], "" if ok_py else "  ⚠ 低于 bootstrap 要求"))
+    py_line = "[1/6] python   %s %s %d.%d%s" % (
+        v, "≥" if ok_py else "<", MIN_PY[0], MIN_PY[1], "" if ok_py else "  ⚠ 低于 bootstrap 要求")
+    if not pytest_available():
+        py_line += " ｜ pytest 未安装（用例不会跑，证据页记跳过）"
+    out.append(py_line)
 
     head = git("rev-parse", "--short", "HEAD")
     if not head:
@@ -117,14 +148,14 @@ def six_lines(root):
     else:
         out.append("[5/6] 配置      config.local.json 不在（跑一次 tools/bootstrap.py 会建）")
 
-    ev = root / "reports" / "evidence.md"
-    concl = ""
-    if ev.exists():
-        for ln in ev.read_text(encoding="utf-8", errors="replace").splitlines():
-            if ln.startswith("- 结论："):
-                concl = ln.split("**")[1] if "**" in ln else ln[len("- 结论："):]
-                break
-    out.append("[6/6] 门禁      %s" % (concl or "未跑过（先跑 python tools/evidence.py）"))
+    concl, ev_head = last_evidence(root)
+    if not concl:
+        out.append("[6/6] 上次证据  未跑过（先跑 python tools/evidence.py）")
+    elif ev_head and head and ev_head != head:
+        out.append("[6/6] 上次证据  ⚠ 过期：证据停在 %s，当前 %s —— 重跑 python tools/evidence.py" % (
+            ev_head, head))
+    else:
+        out.append("[6/6] 上次证据  %s（HEAD %s）" % (concl, ev_head or "?"))
 
     return out
 

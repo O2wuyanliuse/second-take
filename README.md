@@ -45,6 +45,8 @@
 
    **干净机器上第一条永远不是 `--check`**：还没建它当然红，那不是装坏了。
 
+   `pytest` 是可选的：不装也能开工，只是 `tools/evidence.py` 里「用例」那一行会写「未跑」。想三项全跑，先 `python -m pip install pytest`。
+
    > **分发包只有一个 zip，文件名带 `-win`——那是历史命名，不是平台限制。** 包里是纯文本与 Python，没有二进制。
    > macOS／Linux 直接 clone 本仓库就行，不必等一个「mac 版」。
 
@@ -83,8 +85,7 @@
 | `rules/` | 判据的「形状」公开、「绑定」不外发；没绑定会明确报「不算绿」 |
 | `skills/` | 两个可直接加载的 skill：主流水线、角色三视图 |
 | `packaging/` | 打包与脱敏（含查重、验包三道闸）＋起步模板 |
-| `tools/` | 批跑面板、资产度量；体检 `tools/doctor.py` |
-| `tools/evidence.py` | 一条命令跑完自检／门禁／用例，把退出码与耗时写成一张证据页（`reports/` 下的 `evidence.md`，不进仓库） |
+| `tools/` | 批跑面板、资产度量；`doctor.py` 体检，`evidence.py` 把退出码写成一张证据页（`reports/` 下，不进仓库） |
 
 想按环节读，入口是 `Agent框架/00_主轴_按环节读_v1.md`。
 

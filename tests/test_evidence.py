@@ -91,9 +91,10 @@ def test_no_tests_runs_two_steps(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "run_cmd", fake_runner([0, 2]))
     rows = mod.collect(skip_tests=True)
     assert len(rows) == 2
-    passed, line = mod.verdict(rows)
+    passed, line = mod.verdict(rows, no_tests=True)
     assert passed is True
     assert "2/2" in line
+    assert "--no-tests" in line
 
 
 def test_report_file_has_exit_code_column(tmp_path, monkeypatch):
@@ -136,3 +137,41 @@ def test_missing_script_fails_even_though_python_exits_2(tmp_path, monkeypatch):
     passed, line = mod.verdict(mod.collect())
     assert passed is False, line
     assert "第 2 条" in line and "门禁" in line
+
+
+def test_pytest_missing_is_skip_not_red(tmp_path, monkeypatch):
+    """没装 pytest 是「没跑」，不是「坏了」。
+
+    zip 用户手上可能根本没有 pytest；这一页在他那儿第一眼就红，等于把一个
+    可选依赖写成了必装项。跳过必须写进结论，不能混成「全过了」。
+    """
+    mod = load_evidence()
+    monkeypatch.setattr(mod, "REPO", fake_repo(tmp_path))
+    monkeypatch.setattr(mod, "pytest_available", lambda: False)
+    monkeypatch.setattr(mod, "run_cmd", fake_runner([0, 2]))
+
+    rows = mod.collect()
+    assert len(rows) == 3, "跳过要留在表里，分母仍是 3"
+    assert rows[2]["skipped"] is True
+
+    passed, line = mod.verdict(rows)
+    assert passed is True, line
+    assert "2/3" in line
+    assert "用例未跑：未安装 pytest" in line
+
+
+def test_report_marks_skipped_row(tmp_path, monkeypatch):
+    """纸上的「—」比省略更像话：读者能看出这一项没跑，而不是漏了一行。"""
+    mod = load_evidence()
+    monkeypatch.setattr(mod, "REPO", fake_repo(tmp_path))
+    monkeypatch.setattr(mod, "pytest_available", lambda: False)
+    monkeypatch.setattr(mod, "run_cmd", fake_runner([0, 2]))
+
+    out = tmp_path / "evidence.md"
+    rc = mod.main(["--out", str(out)])
+    assert rc == 0
+
+    text = out.read_text(encoding="utf-8")
+    assert "未跑：未安装 pytest" in text
+    assert "| — |" in text
+    assert "2/3" in text
