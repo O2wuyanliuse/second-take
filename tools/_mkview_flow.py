@@ -40,7 +40,7 @@
 
 用法：
     python tools/_mkview_flow.py <镜表.md> -o "[视图]环节.html"
-    python tools/_mkview_flow.py <镜表.md> -o out.html --title "预告片 · 23 格"
+    python tools/_mkview_flow.py <镜表.md> -o out.html --title "镜表 · 一场"
     python tools/_mkview_flow.py <镜表.md> -o out.html --pick T-04    # 单格页默认打开哪格
 """
 
