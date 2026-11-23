@@ -2,63 +2,87 @@
 
 > **Chinese version (complete):** [README.md](README.md) — the Chinese text is the normative one; this English page is a full translation of it.
 
-**A method layer that turns a long story into shootable shots — and every shot into a reproducible prompt.**
+A method layer that turns a long story into shootable shots — and every shot into a reproducible prompt. Every step has a criterion; when something comes out wrong you can see which step stopped.
 
-Not a prompt collection. What it gives you is criteria, gates and ledgers: every step has a pass/fail judgement, and when something comes out wrong you can see which step stopped.
+## What it does
 
-Not sure where to start reading? Open `INDEX.md`; if you just want the AI to do the work, jump to "First words for your AI".
+- Story → storyboard → reproducible prompts → an image, without coming back to ask a human halfway.
+- Every frame records *why* it is shot that way — not "roll until something looks right".
+- Every step has an acceptance test: what counts as passed, who decides when it fails.
+- The skills you already use stay: they generate, this library judges.
 
-> `Take 2` on a film set means "one more, until it's right".
-> `my take` means "how I see it". The name is both: **regenerate until it's correct.**
+## What it doesn't do
 
-## First words for your AI
+- **It does not generate images, edit video, or voice anything.** Pictures and cuts still come from your own models and tools; this library only decides whether a frame passes.
+- **It does not decide for you.** Where judgement is needed it stops and asks, instead of walking on.
+- **It is not a prompt template collection.** Copying it as templates will waste it (see "Boundaries").
+- **No network, no upload, no reading elsewhere on your machine.** Criteria are files, not services: no MCP, no vector store, no memory plugin, no pile of skills, and no API key needed to self-check.
 
-Send this to your AI together with the repository address:
+## Three steps
 
-> This is the second-take repository: https://github.com/O2wuyanliuse/second-take
-> Follow the "Quick start" in README.md to set up the environment, and paste back every command you ran with its exit code.
+### 1. Get the package
 
-It will clone or unpack, then run `tools/bootstrap.py` itself. All you have to check is the last line it prints: **结论: 可以开工。** ("ready to start"). If that line isn't there, tell it to fix whatever is missing and run again.
+Download `second-take-x.y.z-win.zip` from [Releases](https://github.com/O2wuyanliuse/second-take/releases), or `git clone` this repository (clone only matters if you want to follow updates).
 
-**If you don't want to open a terminal, this section is the whole install procedure.**
+**You need Python 3.11+**, nothing else. The `-win` in the file name is history, not a platform limit: the package is plain text and Python, no binaries; macOS and Linux use the same one.
 
-## Quick start
+### 2. Install
 
-Python 3.11+ and git. Nothing else to install.
+**A. Let your AI install it (recommended — the path shown in the demo video)**
+
+Drag the zip straight into your AI workbench's chat (DSH, Claude Code, Cursor — any of them) together with this line:
+
+> Unpack this archive into an empty directory, run `python tools/bootstrap.py` there, and paste back the three lines it prints.
+
+**If you don't want to open a terminal, that is the whole install.**
+
+**B. Do it yourself**
+
+In the unpacked directory:
 
 ```bash
-git clone <this repo>
-cd second-take
-python3 tools/bootstrap.py             # Windows: python tools/bootstrap.py
-python3 tools/bootstrap.py --check     # Windows: python tools/bootstrap.py --check
+python tools/bootstrap.py           # create the workspace, then self-check once
+python tools/bootstrap.py --check   # inspect only, writes nothing
 ```
 
-Exit code `0` means the environment is ready. Anything else prints exactly what is missing and how to fix it. Directories it needs, it creates itself.
+**On a clean machine the first command is always `bootstrap.py`, never `--check`**: the workspace does not exist yet, so `--check` will fail — that is "not built yet", not "broken".
 
-**On a fresh clone the first command is `bootstrap.py` (create), not `--check` (inspect).** `--check` first always fails on a clean machine — that is "not built yet", not "broken".
+`pytest` is optional: without it you can still start, but the "tests" row in the evidence page reads "not run". To cover all three rows: `python -m pip install pytest`.
 
-`pytest` is optional: without it you can still start, but the "tests" row in `tools/evidence.py` will read "not run". To cover all three rows: `python -m pip install pytest`.
+### 3. Read what it said
 
-Then open `开工提示词.md` (Chinese) and paste that block into your AI assistant — it asks you three questions (where the source is / what genre / how it relates to the original), then takes you to your first frame. You don't need to read anything else before that.
+What you get is not a wall of green — it is these three lines:
 
-## What you don't need
+```
+我在哪：工作区已建好，但 input/ 里还没有原文   (where I am: workspace built, no source text in input/ yet)
+能自动检查的：3/19（16%）                      (machine-checkable: 3 of 19)
+下一步：① 放原文进 workspace/input/ ② 对 AI 说「按 E0 开工」   (next steps)
+```
 
-- **No network.** This library makes no requests of its own; every judgement is local.
-- **No MCP, no vector store, no memory plugin.** Criteria are files, not services.
-- **No pile of skills.** There are exactly two, and they only act when you call them.
-- **No API key to run the self-check.** `tools/bootstrap.py --check` costs nothing.
+The same text is written to `workspace/开工报告.md`; to see it again at any time: `python tools/status.py`.
+
+**About that 16%.** There are 19 criteria, and the machine can judge only a small part of them today; the rest rely on the criteria tables and your own eyes. The number is there to help you estimate risk, not to be a score — it going up is what would mean this thing actually got stronger. And it is not a threshold: you can start with nothing passing, there is just no protection on that stretch of road — deviations have to be spotted by a human.
+
+## Then: your first frame
+
+Open `开工提示词.md` (Chinese) and paste that block into your AI. It asks you three questions first (where the source is / what genre / how it relates to the original), then takes you to your first frame. **You do not need to read any other document before that.**
+
+Stuck or nothing comes out: [open an Issue](https://github.com/O2wuyanliuse/second-take/issues) with the output of `python tools/doctor.py`.
 
 ## What's inside
 
 | Directory | What it is |
 |---|---|
-| `Agent框架/` | Per-step criteria and judgement tables. Entry point: `Agent框架/00_主轴_按环节读_v1.md` |
+| `Agent框架/` | Per-step criteria and judgement tables (count with `ls`; docs don't quote numbers) |
 | `shapes/` | Empty criteria / step / handoff forms. Take one, fill it with your own rules |
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
-| `packaging/` | Packing and de-identification: leak scan, duplicate check, package verify |
-| `skills/` | Two skills you can load directly: the main pipeline and character turnaround; install and invoke lines are at the top of each SKILL.md |
-| `tools/` | Batch panel, asset measurement, bootstrap, release; `doctor.py` for a health check, `evidence.py` to turn exit codes into a one-page proof (`reports/`, git-ignored) |
-| `tests/` | The checkers' own test suite — `python -m pytest -q` |
+| `skills/` | Two loadable skills: the main pipeline and character turnaround; install and invoke lines sit at the top of each SKILL.md |
+| `packaging/` | Packing and de-identification (leak scan, duplicate check, package verify) plus blank templates for your own project |
+| `tools/` | `bootstrap.py` installs, `status.py` shows progress, `doctor.py` health-checks, `evidence.py` stores proof; plus a batch panel and asset measurement |
+| `docs/` | Maintainer docs: the five release steps (`docs/maintain/维护方法.md`), upgrade and rollback (`docs/upgrade.md`) |
+| `tests/` | The checkers' own test suite: `python -m pytest -q` |
+
+To read by pipeline stage, start at `Agent框架/00_主轴_按环节读_v1.md`; if you don't know where to start, open `INDEX.md`.
 
 ## Three premises
 
@@ -68,32 +92,33 @@ If you disagree with these, the rest will feel wrong:
 2. **Drafts are physically separated from the source.** Until every self-check passes, the source is not touched by a single character.
 3. **A character only acts on what that character knows.** What the author knows must not leak out of a character's mouth.
 
-## Check it yourself
+## Trust and verification
 
-No trust required — three commands:
+- **No network, no telemetry, no reading elsewhere on your machine**; Python is the only thing to install.
+- Want to know **where you are and what will trip you**: `python tools/status.py` — plain language only: coverage, risks, next steps; it always exits 0 (a mirror, not a gate — it never blocks you).
+- Want to know **the state of this repository and workspace**: `python tools/doctor.py` (six lines: python / git / version / workspace / config / last evidence).
+- Want to know **whether you shipped something you shouldn't have**: `packaging/_leakscan.py --words <your wordlist>`. This repository ships no wordlist — a wordlist spells out the words it bans, so it belongs to your project, not here.
 
-```bash
-python packaging/_doctor.py                                            # which side am I on? what's missing?
-python packaging/_triage.py .                                          # structural signals: secrets, local paths
-python packaging/_leakscan.py --words <your_wordlist.txt>              # scan with YOUR wordlist, history included
-```
+## Boundaries
 
-**This repository ships no wordlist.** A denylist has to spell out the words it bans, so keeping one in the repo leaks them once by definition — it was moved out on 2026-11-21 (CI injects it from a repository secret; locally you pass `--words`).
+**This is not a prompt encyclopedia; it is criteria and gates.**
 
-Two doctors, not one: `packaging/_doctor.py` inspects the **inside of a distribution package** (is the wordlist there, which side am I on); `tools/doctor.py` inspects **this repository and workspace** (six lines: python / git / version / workspace / config / last evidence). They are deliberately not merged.
+It does not replace production. It turns the method you already use into machine-checkable rules, and points at contradictions in your operation and conflicts with the criteria.
 
-On a fresh clone the last two return exit code **2**. That is **"not checked"**, not "clean": wordlists belong to your project, not to this library. The scanner refuses to give you a green it didn't earn.
+Its scope: when the result is off, it helps you tell whether the prompt was the problem or something else. If you already run a mature prompt skill, keep it — let the model turn that run's practice into a few criteria, and use those to judge the next one.
 
-## Security
+The prompt experience in this repository is used in exactly two ways: **calibration** (does the skill's output contradict itself, does it turn literary words into numbers, does it fight the criteria) and **judging** (does this frame pass).
 
-Local scripts only: no telemetry, no network beyond the `git` commands you run yourself, no elevated permissions. Boundaries and the reporting channel: `SECURITY.md`.
+**One line: skills generate, this repository judges.**
 
-One thing to read before you run the packer: `packaging/_pack.py --out <dir>` **deletes** that output directory when a hard gate fails. Point `--out` at a dedicated, empty directory.
+## The name
+
+`Take 2` on a film set means "one more, until it's right"; `my take` means "how I see it". The name is both: **regenerate until it's correct.**
 
 ## License
 
-- Code (`*.py`, scripts, CI): Apache-2.0 — commercial use allowed, modifications don't have to be open.
-- Docs and methodology (`*.md`, images, prompt templates): CC BY-SA 4.0 — attribution required, derivatives under the same license.
+- Code (`*.py`, scripts, CI): [Apache-2.0](LICENSE) — commercial use allowed, modifications don't have to be open.
+- Docs and methodology (`*.md`, images, prompt templates): [CC BY-SA 4.0](LICENSE-DOCS) — attribution required, derivatives under the same license.
 
 Out of scope: any novel text, character settings, or media files. This repository contains none and does not accept pull requests containing them.
 

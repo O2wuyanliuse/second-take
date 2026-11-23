@@ -1,80 +1,73 @@
 # second-take
 
-> **English (short):** a method layer that turns a long story into shootable shots and reproducible prompts — criteria and gates, not a prompt collection. Python 3.11+, runs locally, no telemetry, no network calls of its own. Start with `python tools/bootstrap.py --check`. → [English README](README.en.md)｜Code Apache-2.0 ／ docs CC BY-SA 4.0.
+> **English (short):** a method layer that turns a long story into shootable shots and reproducible prompts — criteria and gates, not a prompt collection. Python 3.11+, runs locally, no telemetry, no network calls of its own. Unpack the zip, run `python tools/bootstrap.py`. → [English README](README.en.md)｜Code Apache-2.0 ／ docs CC BY-SA 4.0.
 
 把一部长篇拆成能拍的镜头，再把每个镜头写成能复现的提示词。每一步都有判据，出问题能看出停在哪。
 
-不知道从哪读？看 `INDEX.md`；只想让 AI 干活，跳到「给 AI 的第一句话」。
-
-> 拍片时 `Take 2` 是「再来一条」；日常英语里 `my take` 是「我的看法」。这个名字说的是它真正在做的事：**不断重生成，直到对为止**。
-
-## 给 AI 的第一句话
-
-把这一句连同仓库地址一起发给你的 AI：
-
-> 这是 second-take 的仓库：https://github.com/O2wuyanliuse/second-take
-> 请照 README 的「三步开工」帮我把环境配好，并把你跑过的每条命令和退出码贴给我看。
-
-它自己会 clone／解压、跑 `tools/bootstrap.py`。你只需要确认它最后打出来的那行是 **结论: 可以开工。**——不是这句，就让它把缺的那几条补齐再跑一次。
-
-**不想开终端的话，这一节就是全部安装步骤。**
-
-## 三步开工（如果你要自己动手）
-
-> **本库不含任何远端配置。** 压缩包里没有 `.git`，也不需要 `git remote`——解压、建工作区、跑自检就够。若你的 AI 想在本地的 `git init`（纯本地、不联网），可以；但**不要把远端指向任何真实仓库**，本库没有任何功能需要它。
-
-1. `git clone` 本仓库，装 **Python 3.11+**（Windows / macOS / Linux 都行）。先建工作区，再自检：
-
-   POSIX：
-
-   ```bash
-   cd <repo>
-   python3 tools/bootstrap.py
-   python3 tools/bootstrap.py --check
-   ```
-
-   PowerShell：
-
-   ```powershell
-   cd <repo>
-   python tools/bootstrap.py
-   python tools/bootstrap.py --check
-   ```
-
-   第一条只建不查：建好 `workspace/{input,output,cache}` 与 `config.local.json`（已有的不动），顺手接上本机钩子、跑一次最小门禁。第二条只查不写盘，退出 **0** 就说明环境合格；不是 0 它逐条告诉你缺什么。
-
-   **干净机器上第一条永远不是 `--check`**：还没建它当然红，那不是装坏了。
-
-   `pytest` 是可选的：不装也能开工，只是 `tools/evidence.py` 里「用例」那一行会写「未跑」。想三项全跑，先 `python -m pip install pytest`。
-
-   > **分发包只有一个 zip，文件名带 `-win`——那是历史命名，不是平台限制。** 包里是纯文本与 Python，没有二进制。
-   > macOS／Linux 直接 clone 本仓库就行，不必等一个「mac 版」。
-
-2. 打开 `开工提示词.md`，把那段话整段复制给你的 AI。它会先问你三个问题（原文在哪／文体／与原著的关系），然后带你出第一张图。
-
-3. 第一张图出来之后，再回来看这里。**在此之前你不需要读任何文档。**
-
-出不来、或者卡在某一步：[提 Issues](../../issues)，带上 `python packaging/_doctor.py` 的输出。只想提建议就选「建议」模板，不用写代码。
-
-## 第一次来？先看这两份
-
-| 你现在卡在哪 | 先看 |
-|---|---|
-| 还没出第一张图 | `开工提示词.md`——把那段话整段复制给 AI，它会先问你三个问题 |
-| 想剪但不知道怎么下手 | `剪辑引导.md` —— 不判定，只给思路 |
-
-## 它会给你什么
+## 它能做什么
 
 - 一段故事 → 分镜 → 可复现的提示词 → 一张图，中途不用回来问人。
 - 每一格都写着「为什么这样拍」，不是抽卡抽到为止。
 - 每一环都有验收：哪一步算过、没过时找谁拍板。
+- 你已经在用的 skill 不必扔——它管生成，本库管判好坏。
 
-## 不需要什么
+## 它不做什么
 
-- 不需要联网：本库不发任何请求，判断全在本地。
-- 不需要 MCP、向量库、记忆插件：判据是文件，不是服务。
-- 不需要装一堆 skill：本库只有两个，都只在你叫它时才动。
-- 不需要 API key 就能跑自检：`tools/bootstrap.py --check` 不花钱。
+- **不生成画面、不剪辑、不配音。** 出图出片仍靠你手上那套模型和工具；本库只决定「这一格算不算过」。
+- **不替你拍板。** 拿不定主意的地方它会停下来问你，不会自己往下走。
+- **不是提示词模板库。** 拿它当模板抄会把它用废（理由见「边界与免责」）。
+- **不联网、不上传、不读你机器上别处的东西。** 判据是文件，不是服务：不需要 MCP、向量库、记忆插件、一堆 skill，也不需要 API key 就能自检。
+
+## 三步开工
+
+### 第 1 步：拿包
+
+到 [Releases](https://github.com/O2wuyanliuse/second-take/releases) 下 `second-take-x.y.z-win.zip`，或者在机器上 `git clone` 本仓库（clone 只在你想跟更新时用得上）。
+
+**需要 Python 3.11+**，其余不用装。zip 名里的 `-win` 是历史命名、不是平台限制：包里是纯文本与 Python，没有二进制；macOS／Linux 用同一份。
+
+### 第 2 步：装
+
+**A. 让 AI 装（推荐，也是演示视频里那条路）**
+
+把 zip 直接拖进 AI 工作台的对话框（DSH／Claude Code／Cursor 都行），连同下面这句：
+
+> 帮我把这个包解压到一个空目录，在哪个目录里跑 `python tools/bootstrap.py`，跑完把它打出来的三行贴给我。
+
+**不想开终端的话，这就是全部安装步骤。**
+
+**B. 自己装**
+
+在解压后的目录里：
+
+```bash
+python tools/bootstrap.py           # 建工作区 + 跑一次自检
+python tools/bootstrap.py --check   # 只查不写盘
+```
+
+**干净机器上第一条永远是 `bootstrap.py`，不是 `--check`**：工作区还没建，`--check` 当然红——那是「还没建」，不是「装坏了」。
+
+`pytest` 是可选的：不装也能开工，只是证据页里「用例」那一行写「未跑」。想三项全跑：`python -m pip install pytest`。
+
+### 第 3 步：看它说了什么
+
+装完屏幕上不是一串绿字，是这三行：
+
+```
+我在哪：工作区已建好，但 input/ 里还没有原文
+能自动检查的：3/19（16%）
+下一步：① 放原文进 workspace/input/ ② 对 AI 说「按 E0 开工」
+```
+
+同一份内容会写进 `workspace/开工报告.md`，之后随时可再看：`python tools/status.py`。
+
+**关于那个 16%。** 判据一共 19 项，眼下机器能自己判的只有其中一小部分，剩下靠判据表和你的眼睛。这个数字是给你估风险的，不是成绩单——它涨上去，才说明这套东西真的变强了。也别把它当门槛：一项没过也能开工，只是那段路上没有保护，出了偏差得靠人看出来。
+
+## 然后：出第一张图
+
+打开 `开工提示词.md`，把那段话整段复制给你的 AI。它会先问你三个问题（原文在哪／文体／与原著的关系），再带你出第一张图。**在此之前你不需要读任何文档。**
+
+出不来、卡住了：[提 Issues](https://github.com/O2wuyanliuse/second-take/issues)，带上 `python tools/doctor.py` 的输出。
 
 ## 里面有什么
 
@@ -84,10 +77,12 @@
 | `shapes/` | 空的判据／环节／交接表格。题目，可只拿一份 |
 | `rules/` | 判据的「形状」公开、「绑定」不外发；没绑定会明确报「不算绿」 |
 | `skills/` | 两个可直接加载的 skill：主流水线、角色三视图；装法与叫法写在各自 SKILL.md 顶部的「怎么装」 |
-| `packaging/` | 打包与脱敏（含查重、验包三道闸）＋起步模板 |
-| `tools/` | 批跑面板、资产度量；`status.py` 给人看的进度页，`doctor.py` 体检，`evidence.py` 把每次运行写成一张证据页（`reports/` 下，不进仓库） |
+| `packaging/` | 打包与脱敏（含查重、验包三道闸）＋给你自己项目用的空模板 |
+| `tools/` | `bootstrap.py` 装、`status.py` 看进度、`doctor.py` 体检、`evidence.py` 存证据；另有批跑面板与资产度量 |
+| `docs/` | 维护者文档：发版五步（`docs/maintain/维护方法.md`）、升级与回滚（`docs/upgrade.md`） |
+| `tests/` | 检查器自己的用例：`python -m pytest -q` |
 
-想按环节读，入口是 `Agent框架/00_主轴_按环节读_v1.md`。
+想按环节读，入口是 `Agent框架/00_主轴_按环节读_v1.md`；不知道从哪读，看 `INDEX.md`。
 
 ## 三条前提
 
@@ -99,27 +94,26 @@
 
 ## 信任与验证
 
-- **不联网、没有遥测、不读你机器上别处的东西**；要装的只有 Python 和 git。
-- 想知道**包内环境**在哪、缺什么：`python packaging/_doctor.py`（词表在不在、包在哪一侧）。
-- 想知道**现在走到哪、会不会绊**：`python tools/status.py`——只说人话：覆盖率、风险、下一步；同时写一份 `workspace/开工报告.md`。它不打印内部读数，也永远退 0（镜子不是门）。
-- 想知道**这个仓库**现在什么状态：`python tools/doctor.py`（六行：python／git／版本／工作区／配置／上次证据）。
-  两个 doctor 不合并——一个查分发包里的环境，一个查仓库与工作区；合并后每加一个参数，两边都要为对方让路。
-- 报错里的退出码 **2 是「没查成」，不是「干净」**：脱敏扫描要你自己的词表，本库不带——词表属于项目。
+- **不联网、没有遥测、不读你机器上别处的东西**；要装的只有 Python。
+- 想知道**现在走到哪、会不会绊**：`python tools/status.py`——只说人话：覆盖率、风险、下一步；永远退 0（镜子不是门，它不拦你）。
+- 想知道**这个仓库与工作区**什么状态：`python tools/doctor.py`（六行：python／git／版本／工作区／配置／上次证据）。
+- 想知道**自己有没有把不该发的东西发出去**：`packaging/_leakscan.py --words <你的词表>`。本库不带词表——词表本身就会把那些词写出来一遍，所以它属于你的项目，不在这里。
 
 ## 边界与免责
 
 **这份仓库不是提示词大全，是判据与门槛。**
 
-本工具不做生产环节替代，只会根据您已经在使用的方法，进行「可判」的机读语言规则生成，依此指出操作的矛盾点及与判据的冲突点。
+本工具不做生产环节替代，只会根据你已经在使用的方法，生成「可判」的机读规则，依此指出操作里的矛盾点与判据冲突点。
 
-本仓的负责边界为：效果未达预期时，帮您判断是提示词问题还是其他因素问题。如您已经在使用成熟的提示词 skill，请继续使用——您可以让模型按本仓规则，把您该次处理的做法整理成几条判据，用来进行下一次判断。
+本仓的负责边界：效果未达预期时，帮你判断是提示词的问题还是别的因素。你已经在用成熟的提示词 skill，请继续用——你可以让模型按本仓规则，把这次的做法整理成几条判据，用来判下一次。
 
-本仓库里的提示词经验，只在两种时候用：
+本仓库里的提示词经验只在两种时候用：**校准**（查 skill 产出的词有没有自相矛盾、有没有把文学词量化成数字、有没有和判据打架）、**立判据**（决定这一格算不算过）。
 
-1. **校准**：检查 skill 产出的词有没有自相矛盾（一边要虚焦、一边禁虚焦）、有没有把文学词量化成数字、有没有和判据打架；
-2. **立判据**：决定这一格算不算过。
+**分工一句话：skill 管生成，本仓库管判好坏。**
 
-**分工一句话：skill 管生成，本仓库管判好坏。** 拿这份仓库当提示词模板抄，反而会把它用废。
+## 名字
+
+拍片时 `Take 2` 是「再来一条」；日常英语里 `my take` 是「我的看法」。这个名字说的是它真正在做的事：**不断重生成，直到对为止。**
 
 ## 授权
 
@@ -130,4 +124,4 @@
 
 ## 贡献
 
-欢迎 Issue 与 PR，先读 `CONTRIBUTING.md`（有一条关于改动的授权条款）。
+欢迎 Issue 与 PR，先读 `CONTRIBUTING.md`（有一条关于改动的授权条款）；行为准则三行：`CODE_OF_CONDUCT.md`。

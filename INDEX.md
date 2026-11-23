@@ -13,7 +13,8 @@
 | 知道整条流水线有哪些环节 | `Agent框架/环节表_文字到可视化_v1.md` |
 | 装不上 / 卡住 | `README.md` 的「三步开工」→ `python tools/doctor.py` |
 | 证明真的跑过 | `python tools/evidence.py`，结果写在 `reports/` 下的 `evidence.md` |
-| 改维护流程（发版、判据、白名单） | `docs/maintain/维护方法.md` |
+| 升级到新版 / 回到旧版 | `docs/upgrade.md` |
+| 改维护流程（发版、判据、词表） | `docs/maintain/维护方法.md` |
 | 看历史 | `CHANGELOG.md` |
 | 看这个库到底不是什么 | `README.md` 的「边界与免责」 |
 
@@ -29,5 +30,6 @@
 
 | 命令 | 干什么 | 什么时候用 |
 |---|---|---|
-| `python tools/doctor.py` | 六行体检：python／git／版本／工作区／配置／上次门禁 | 装不上，或不确定现在什么状态 |
+| `python tools/status.py` | 三句话：我在哪／能自动查多少／下一步。永远退 0 | 每次开工前看一眼，或不知道接下来干什么 |
+| `python tools/doctor.py` | 六行体检：python／git／版本／工作区／配置／上次证据 | 装不上，或不确定现在什么状态 |
 | `python tools/evidence.py` | 跑三条检查，把退出码写成一张证据页 | 要证明「真的跑过」，或交差之前 |

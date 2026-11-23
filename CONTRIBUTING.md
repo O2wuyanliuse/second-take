@@ -86,4 +86,4 @@ python packaging/_pr_guard.py --range origin/master..HEAD
 
 本地装了 pre-commit 门禁（`.git/hooks/pre-commit`），提交时会自动挡三类东西：作品素材、本机绝对路径、作品专名。正常提交不用你记，被拒了看提示就行。
 
-注意这个 hook **不在版本库里**——克隆下来的人没有它。想把这套门禁带走，按 `packaging/templates/安装.md` 把 `packaging/` 下那几个脚本装上。
+注意这个 hook **不在版本库里**——克隆下来的人没有它。想把这套门禁带走：把 `.githooks/` 拷进你的项目，`git config core.hooksPath .githooks` 指过去；`packaging/templates/README.md` 里是配套的几份空模板。

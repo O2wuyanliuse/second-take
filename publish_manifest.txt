@@ -66,6 +66,7 @@ SECURITY.md
 VERSION
 config.example.json
 docs/maintain/维护方法.md
+docs/upgrade.md
 gate/_e0.py
 gate/_gate.py
 gate/_ignore.py
@@ -87,11 +88,9 @@ packaging/_sync_check.py
 packaging/_triage.py
 packaging/_verify_package.py
 packaging/leak_allow.txt
+packaging/templates/README.md
 packaging/templates/gitignore
-packaging/templates/从这里开始.txt
-packaging/templates/使用说明.txt
 packaging/templates/发布前检查清单.md
-packaging/templates/安装.md
 packaging/templates/常量台账.md
 packaging/templates/版权与开源红线.md
 packaging/templates/跟进通道.md
