@@ -57,6 +57,7 @@ Agent框架/目标参照表_v1.md
 CHANGELOG.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
+INDEX.md
 LICENSE
 LICENSE-DOCS
 README.en.md
@@ -136,6 +137,8 @@ templates/镜表示例.md
 tests/conftest.py
 tests/helpers.py
 tests/test_bootstrap.py
+tests/test_doctor.py
+tests/test_evidence.py
 tests/test_latest.py
 tests/test_leakscan.py
 tests/test_links.py
@@ -149,6 +152,8 @@ tools/bootstrap.py
 tools/build_public_package.py
 tools/check_bilingual.py
 tools/check_maintenance.py
+tools/doctor.py
+tools/evidence.py
 tools/jimeng_bench/server.py
 tools/jimeng_bench/ui/index.html
 tools/release.py

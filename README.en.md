@@ -6,8 +6,21 @@
 
 Not a prompt collection. What it gives you is criteria, gates and ledgers: every step has a pass/fail judgement, and when something comes out wrong you can see which step stopped.
 
+Not sure where to start reading? Open `INDEX.md`; if you just want the AI to do the work, jump to "First words for your AI".
+
 > `Take 2` on a film set means "one more, until it's right".
 > `my take` means "how I see it". The name is both: **regenerate until it's correct.**
+
+## First words for your AI
+
+Send this to your AI together with the repository address:
+
+> This is the second-take repository: https://github.com/O2wuyanliuse/second-take
+> Follow the "Quick start" in README.md to set up the environment, and paste back every command you ran with its exit code.
+
+It will clone or unpack, then run `tools/bootstrap.py` itself. All you have to check is the last line it prints: **结论: 可以开工。** ("ready to start"). If that line isn't there, tell it to fix whatever is missing and run again.
+
+**If you don't want to open a terminal, this section is the whole install procedure.**
 
 ## Quick start
 
@@ -26,6 +39,13 @@ Exit code `0` means the environment is ready. Anything else prints exactly what 
 
 Then open `开工提示词.md` (Chinese) and paste that block into your AI assistant — it asks you three questions (where the source is / what genre / how it relates to the original), then takes you to your first frame. You don't need to read anything else before that.
 
+## What you don't need
+
+- **No network.** This library makes no requests of its own; every judgement is local.
+- **No MCP, no vector store, no memory plugin.** Criteria are files, not services.
+- **No pile of skills.** There are exactly two, and they only act when you call them.
+- **No API key to run the self-check.** `tools/bootstrap.py --check` costs nothing.
+
 ## What's inside
 
 | Directory | What it is |
@@ -34,8 +54,9 @@ Then open `开工提示词.md` (Chinese) and paste that block into your AI assis
 | `shapes/` | Empty criteria / step / handoff forms. Take one, fill it with your own rules |
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
 | `packaging/` | Packing and de-identification: leak scan, duplicate check, package verify |
-| `tools/` | Batch panel, asset measurement, bootstrap, release |
-| `tests/` | 32 cases that test the checkers themselves — `python -m pytest -q` |
+| `tools/` | Batch panel, asset measurement, bootstrap, release; health check `tools/doctor.py` |
+| `tools/evidence.py` | One command runs self-check / gate / tests and writes exit codes and timings to an evidence page (`evidence.md` under `reports/`, git-ignored) |
+| `tests/` | The checkers' own test suite — `python -m pytest -q` |
 
 ## Three premises
 

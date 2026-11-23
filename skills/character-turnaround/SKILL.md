@@ -6,6 +6,10 @@ agent_created: true
 
 # Character Turnaround (角色三视图)
 
+> **怎么装**：把本目录的地址发给你的 Agent，说「帮我装上这个 skill」。
+> **怎么叫**：`用 character-turnaround 给我出一张三视图`。
+> **验证**：装完问它「你现在会哪几步」，它应能复述 SKILL.md 里的条目名。
+
 ## Purpose
 
 Produce one image containing the same character seen from front, true profile and back, on a plain white background, with identical costume, hairstyle and body proportion across all three views.
