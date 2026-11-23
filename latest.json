@@ -1,13 +1,13 @@
 {
   "_说明": "发版产物，不是构建产物。只有 release 动作里写一次；没发版就不许改这里——改了等于对全体用户广播。",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "date": "2026-11-23",
   "channel": "stable",
   "severity": "normal",
   "min_client": "0.2.0",
-  "notes_url": "https://github.com/O2wuyanliuse/second-take/releases/tag/v1.0.0",
+  "notes_url": "https://github.com/O2wuyanliuse/second-take/releases/tag/v1.0.1",
   "tip": "",
   "pack_urls": {
-    "windows": "https://github.com/O2wuyanliuse/second-take/releases/download/v1.0.0/second-take-1.0.0-win.zip"
+    "windows": "https://github.com/O2wuyanliuse/second-take/releases/download/v1.0.1/second-take-1.0.1-win.zip"
   }
 }
