@@ -24,3 +24,12 @@ docs/maintain/维护方法.md→packaging/leak_known_history.txt = v2.5 已删�
 CHANGELOG.md→docs/为什么值得信.md = v3.6 已移出仓库
 docs/maintain/维护方法.md→docs/internal/开源审计_20261117.md = v3.6 已移出仓库
 docs/maintain/维护方法.md→docs/internal/README.md = v3.6 已移出仓库
+
+# 2026-11-23 v1.0.0：三份上一代说明书已删（共 854 行）。
+# 下列是**变更记录里记的当时文件名**，不是现在该存在的文件——断链是事实，不是错。
+CHANGELOG.md→安装.md = v1.0.0 已删；变更记录在讲「删了什么」
+CHANGELOG.md→从这里开始.txt = v1.0.0 已删；同上
+CHANGELOG.md→使用说明.txt = v1.0.0 已删；同上
+docs/maintain/维护方法.md→安装.md = v1.0.0 已删；§9 历史条目在讲「删了什么」
+docs/maintain/维护方法.md→从这里开始.txt = v1.0.0 已删；同上
+docs/maintain/维护方法.md→使用说明.txt = v1.0.0 已删；同上

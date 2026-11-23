@@ -74,6 +74,39 @@ SCOPE_FILE = os.path.join(ROOT, "links_scope.json")
 
 CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
 
+# 裸文件名（不带斜杠）默认**不查**——项目层到处是「交接_当前进度.md」这种引用，放开会红成一片。
+# 但通用层的入口件不一样：`安装.md` 被删之后，「打开包里的 `安装.md`」就成了一条死路，
+# 而第一遍（只认带斜杠的路径）看不见它。2026-11-23 就是这么漏的。
+# 所以这里列一份**很窄**的清单：库自身的入口件 ＋ v1.0.0 删掉的三份。
+# 新名字要进这份清单，得先问一句：它是「谁都不该凭空发明」的入口件吗？
+BARE_NAMES = (
+    "README.md", "README.en.md", "AGENTS.md", "INDEX.md", "CHANGELOG.md",
+    "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
+    "开工提示词.md", "发布前检查清单.md", "版权与开源红线.md", "剪辑引导.md",
+    "安装.md", "从这里开始.txt", "使用说明.txt",
+)
+
+
+def bare_candidates(text):
+    """反引号里、不带斜杠、且落在 `BARE_NAMES` 里的文件名。"""
+    out = []
+    for m in CODE_SPAN.finditer(text):
+        s = m.group(1).strip()
+        if "/" in s.replace("\\", "/"):
+            continue
+        if s in BARE_NAMES and s not in out:
+            out.append(s)
+    return out
+
+
+def all_basenames():
+    """仓库里所有文件名（跳过缓存目录）。用于判断裸名有没有落点。"""
+    names = set()
+    for dp, dn, fns in os.walk(ROOT):
+        dn[:] = [d for d in dn if d not in SKIP_DIRS]
+        names.update(fns)
+    return names
+
 
 
 def load_scope():
@@ -224,6 +257,8 @@ def main():
     allow, noreason = load_allow()
     scope_dirs, scope_pats = load_scope()
     hard, soft, checked, pardoned, scoped = [], [], 0, 0, 0
+    bare_hard, bare_checked = [], 0
+    basenames = all_basenames()
     for fp in files:
         rel = os.path.relpath(fp, ROOT).replace("\\", "/")
         if rel.startswith(SKIP_REF):
@@ -232,6 +267,15 @@ def main():
             text = io.open(fp, encoding="utf-8", errors="replace").read()
         except OSError:
             continue
+        # 裸文件名先查：它不带斜杠，下面 candidates() 的 `"/" not in s2` 会整条放过。
+        for s in bare_candidates(text):
+            bare_checked += 1
+            if s in basenames:
+                continue
+            if (rel, s) in allow:
+                pardoned += 1
+                continue
+            bare_hard.append((rel, s))
         cands = candidates(text)
         if not cands:
             continue
@@ -250,17 +294,19 @@ def main():
             (soft if declared else hard).append((rel, c))
 
     bhard, bsoft, bchecked = scan_brackets(files, allow)
-    print("[links] 扫 %d 份 md ｜ 候选路径 %d 条 ｜ 类别名 %d 条 ｜ 豁免 %d 条"
-          % (len(files), checked, bchecked, pardoned))
+    print("[links] 扫 %d 份 md ｜ 候选路径 %d 条 ｜ 裸文件名 %d 条 ｜ 类别名 %d 条 ｜ 豁免 %d 条"
+          % (len(files), checked, bare_checked, bchecked, pardoned))
     # 自报范围（本项目的规矩：没 `[scope]` 的绿不认——不懂正则的人唯一能审的维度）。
     print("[scope] 扫 %d 份 md（跳过 %s）｜ 候选 %d 条"
           % (len(files), "／".join(sorted(SKIP_DIRS)), checked))
     print("[scope] 判据：反引号里、以本仓库一级目录开头、带扩展名、无空格无通配的路径，"
           "在仓库里真的存在")
-    print("[scope] 第二遍查「类别名」：`[标准]／[台账]／[方法]…` 开头、不带斜杠的引用，"
+    print("[scope] 第二遍查「裸文件名」：`安装.md` 这种不带斜杠的，只认 BARE_NAMES 里那几份"
+          "（库入口件＋已删文档），仓库里没有同名文件就报")
+    print("[scope] 第三遍查「类别名」：`[标准]／[台账]／[方法]…` 开头、不带斜杠的引用，"
           "仓库里有没有名字含它的文件")
-    print("[scope] **查不了**：引用内容对不对；只写文件名不带目录的（除类别名）；不在反引号里的；"
-          "提交信息里的；名字写对了但指错对象的")
+    print("[scope] **查不了**：引用内容对不对；不在 `BARE_NAMES` 里的裸文件名；"
+          "不在反引号里的；提交信息里的；名字写对了但指错对象的")
     if noreason:
         print("[links] ⚠️ `links_allow.txt` 里这几行没写理由，不算豁免：%s" % "、".join(noreason))
     if soft:
@@ -269,6 +315,10 @@ def main():
         print("[links] 其中 %d 处属于「项目实例」（links_scope.json），降级为提示" % scoped)
     if bsoft:
         print("[links] 类别名：%d 处落在「已声明含项目实例」的文件里，降级为提示" % len(bsoft))
+    if bare_hard:
+        print("[links] 裸文件名找不到：%d 处" % len(bare_hard))
+        for rel, s in bare_hard:
+            print("  ✗ %s → %s" % (rel, s))
     if bhard:
         print("[links] 类别名找不到落点：%d 处" % len(bhard))
         for rel, s in bhard:
@@ -284,13 +334,15 @@ def main():
         for rel, c in soft:
             print("  · %s → %s（已声明，提示）" % (rel, c))
 
-    if hard or bhard:
-        print("\n✗ 断链 %d 处（另有类别名 %d 处、提示 %d 处）" % (len(hard), len(bhard), len(soft)))
+    if hard or bhard or bare_hard:
+        print("\n✗ 断链 %d 处（另有裸文件名 %d 处、类别名 %d 处、提示 %d 处）"
+              % (len(hard), len(bare_hard), len(bhard), len(soft)))
         print("[links] 修法：① 真该存在的 → 补文件；② 只是「名字」的 → 去掉路径前缀；")
         print("        ③ 是项目实例的 → 在文件开头加一句「本文出现的 xxx 是项目实例，带走后不存在是正常的」")
         return 1
 
-    print("\n✅ 干净：%d 条候选路径全部存在（另有 %d 处提示）" % (checked - len(soft), len(soft)))
+    print("\n✅ 干净：%d 条候选路径全部存在（裸文件名 %d 条已核；另有 %d 处提示）"
+          % (checked - len(soft), bare_checked, len(soft)))
     return 0
 
 

@@ -54,3 +54,32 @@ def test_ignored_dir_is_not_scanned(sandbox):
     write(sandbox, "__pycache__/草稿.md", "见 `docs/根本没有.md`。\n")
     r = run(sandbox, "gate/_links.py")
     assert r.returncode == 0, r.stdout
+
+
+def test_bare_name_that_does_not_exist_blocks(sandbox):
+    """裸文件名（不带斜杠）也要查。
+
+    2026-11-23 漏过一次：`安装.md` 被删之后，`gate/_gate.py` 里还写着
+    「打开包里的 `安装.md`」——它不带斜杠，第一遍的 candidates() 整条放过。
+    """
+    links(sandbox)
+    write(sandbox, "README.md", "打不开就照 `安装.md` 做。\n")
+    r = run(sandbox, "gate/_links.py")
+    assert r.returncode == 1
+    assert "安装.md" in r.stdout
+    assert "裸文件名" in r.stdout
+
+
+def test_bare_name_that_exists_passes(sandbox):
+    links(sandbox)
+    write(sandbox, "README.md", "照 `README.md` 的三步开工做。\n")
+    r = run(sandbox, "gate/_links.py")
+    assert r.returncode == 0, r.stdout
+
+
+def test_bare_name_outside_list_is_not_checked(sandbox):
+    """清单外的裸名不查——项目层到处是「交接_当前进度.md」，放开会红成一片。"""
+    links(sandbox)
+    write(sandbox, "README.md", "见 `交接_当前进度.md`。\n")
+    r = run(sandbox, "gate/_links.py")
+    assert r.returncode == 0, r.stdout
