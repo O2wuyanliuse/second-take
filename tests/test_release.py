@@ -5,10 +5,13 @@
 """
 
 import importlib.util
+import json
+import os
+from pathlib import Path
 
 import pytest
 
-from helpers import REPO
+from helpers import REPO, commit, copy_into, git, write
 
 _spec = importlib.util.spec_from_file_location("release_mod", REPO / "tools" / "release.py")
 release = importlib.util.module_from_spec(_spec)
@@ -95,3 +98,47 @@ def test_owner_repo_prefers_env(monkeypatch):
     monkeypatch.setattr(release, "_OWNER_REPO", None)
     monkeypatch.setenv("SECOND_TAKE_OWNER", "someone/else")
     assert release.owner_repo() == "someone/else"
+
+
+def load_release_in(root):
+    """按临时仓库的路径重新加载一次——ROOT 是模块级常量，不能复用真实仓库那份。"""
+    spec = importlib.util.spec_from_file_location(
+        "release_sandbox", Path(root) / "tools" / "release.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod._OWNER_REPO = "example/second-take"
+    return mod
+
+
+def test_commit_failure_does_not_drop_previous_commit(sandbox):
+    """commit 失败时只还原文件字节，不许 reset 掉**上一个**提交。
+
+    2026-11-23 小渊在工作区副本里撞到过：钩子一红，HEAD 从 49435f0 掉到 3bac61a，
+    撤掉的是一个与本次发版无关的提交。真实仓库那次只是恰好没走这条分支。
+    """
+    copy_into(sandbox, "tools/release.py")
+    write(sandbox, "README.md", "# 起点\n")
+    commit(sandbox, "起点")
+
+    latest_old = json.loads((REPO / "latest.json").read_text(encoding="utf-8"))
+    latest_old["version"] = "0.5.0"
+    write(sandbox, "VERSION", "0.5.0 · 2026-11-22\n")
+    write(sandbox, "latest.json", json.dumps(latest_old, ensure_ascii=False, indent=2))
+    commit(sandbox, "0.5.0")
+    head_protected = git(sandbox, "rev-parse", "HEAD").stdout.strip()
+
+    # 让 commit 必然失败：一条 exit 1 的 pre-commit 钩子。
+    hook = Path(sandbox) / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    os.chmod(hook, 0o755)
+
+    mod = load_release_in(sandbox)
+    with pytest.raises(mod.Broken):
+        mod.write_all("0.6.0", "2026-11-23", "stable", "normal", latest_old, False)
+
+    assert git(sandbox, "rev-parse", "HEAD").stdout.strip() == head_protected, \
+        "上一个提交被 reset 掉了——这正是要防的那个 bug"
+    assert (Path(sandbox) / "VERSION").read_text(encoding="utf-8").startswith("0.5.0"), \
+        "文件字节没还原"
+    assert git(sandbox, "tag").stdout.strip() == "", "不该留下半个 tag"

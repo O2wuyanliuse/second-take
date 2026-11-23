@@ -271,6 +271,7 @@ def write_all(new: str, date: str, channel: str, severity: str, latest_old: dict
         return
 
     done = []
+    committed = False
     try:
         for p, new_text, old_text in plan:
             p.write_text(new_text, encoding="utf-8")
@@ -288,6 +289,7 @@ def write_all(new: str, date: str, channel: str, severity: str, latest_old: dict
         r = sh("git", "commit", "-m", msg)
         if r.returncode != 0:
             raise Broken("git commit 失败：%s" % (r.stderr.strip()[:200] or ""))
+        committed = True
         print("  · 提交 %s" % ", ".join(names))
         r = sh("git", "tag", "-a", tag, "-m", "release %s" % new)
         if r.returncode != 0:
@@ -295,8 +297,11 @@ def write_all(new: str, date: str, channel: str, severity: str, latest_old: dict
         print("  · 打 tag %s" % tag)
     except Exception as e:
         sh("git", "tag", "-d", tag)
-        # 提交一旦成功，回滚要把那次提交撤掉（--soft，改动留在工作区，未丢字节）
-        sh("git", "reset", "--soft", "HEAD~1")
+        # 只有**这次**的提交真的成功了，才撤销 HEAD~1。commit 失败时撤 HEAD~1，
+        # 撤掉的是上一个与本次无关的提交——2026-11-23 小渊在工作区副本里撞到过
+        # （HEAD 从 49435f0 掉到 3bac61a），真实仓库只是恰好没走到这条分支。
+        if committed:
+            sh("git", "reset", "--soft", "HEAD~1")
         for p, old_text in reversed(done):
             p.write_text(old_text, encoding="utf-8")
         raise Broken("写入失败，已回滚（%s）。原因：%s" % ("VERSION/latest.json/提交/tag", e))
