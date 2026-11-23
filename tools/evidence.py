@@ -85,6 +85,18 @@ def collect(skip_tests=False):
         if skip_tests and label == "用例":
             continue
         idx += 1
+        # 脚本不在，就别交给解释器：Python 找不到文件时**也退 2**，而 2 在本库是
+        # 「提示档」，会被当成通过。那正是「故意改名必须判红」要抓的那种假绿。
+        script = next((a for a in argv if a.endswith(".py")), None)
+        if script and not (REPO / script).exists():
+            rows.append({
+                "idx": idx, "label": label, "cmd": "python " + " ".join(argv),
+                "rc": 127, "ok": ok, "secs": 0.0,
+                "out": "脚本不存在：%s" % script,
+                "key": "脚本不存在：%s" % script,
+            })
+            continue
+
         # 解释器用 sys.executable：Windows 上 `python` 可能是另一个装法。
         cmd = [sys.executable]
         for a in argv:
