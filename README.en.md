@@ -56,6 +56,7 @@ Then open `开工提示词.md` (Chinese) and paste that block into your AI assis
 | `shapes/` | Empty criteria / step / handoff forms. Take one, fill it with your own rules |
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
 | `packaging/` | Packing and de-identification: leak scan, duplicate check, package verify |
+| `skills/` | Two skills you can load directly: the main pipeline and character turnaround; install and invoke lines are at the top of each SKILL.md |
 | `tools/` | Batch panel, asset measurement, bootstrap, release; `doctor.py` for a health check, `evidence.py` to turn exit codes into a one-page proof (`reports/`, git-ignored) |
 | `tests/` | The checkers' own test suite — `python -m pytest -q` |
 
@@ -78,6 +79,8 @@ python packaging/_leakscan.py --words <your_wordlist.txt>              # scan wi
 ```
 
 **This repository ships no wordlist.** A denylist has to spell out the words it bans, so keeping one in the repo leaks them once by definition — it was moved out on 2026-11-21 (CI injects it from a repository secret; locally you pass `--words`).
+
+Two doctors, not one: `packaging/_doctor.py` inspects the **inside of a distribution package** (is the wordlist there, which side am I on); `tools/doctor.py` inspects **this repository and workspace** (six lines: python / git / version / workspace / config / last evidence). They are deliberately not merged.
 
 On a fresh clone the last two return exit code **2**. That is **"not checked"**, not "clean": wordlists belong to your project, not to this library. The scanner refuses to give you a green it didn't earn.
 
