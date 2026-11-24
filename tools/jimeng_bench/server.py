@@ -61,7 +61,7 @@ def origin_ok(origin):
         o = urlparse(origin)
     except ValueError:
         return False
-    return o.scheme == "http" and o.hostname in ALLOWED_HOSTS
+    return o.scheme in ("http", "https") and o.hostname in ALLOWED_HOSTS
 
 
 def safe_path(base, name, exts=None):

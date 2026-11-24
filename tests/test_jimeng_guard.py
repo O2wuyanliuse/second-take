@@ -55,6 +55,19 @@ def test_safe_path_rejects_absolute(tmp_path):
     assert mod.safe_path(base, str(tmp_path / "outside.txt")) is None
 
 
+def test_origin_https_loopback_allowed():
+    """TLS 反代套在前面时，Origin 会是 https——回环仍然算本机。
+
+    方案里这条是「可选」：本服务是明文 http.server，眼下没有 https 部署。
+    但放着不测，哪天有人遇到反代就顺手改一行、也没人知道被改过。
+    """
+    mod = load_server()
+    assert mod.origin_ok("https://127.0.0.1:8765") is True
+    assert mod.origin_ok("https://localhost:8765") is True
+    assert mod.origin_ok("http://127.0.0.1:8765") is True
+    assert mod.origin_ok("https://evil.example") is False, "https 不等于可信"
+
+
 def test_validate_bad_num_does_not_raise():
     """P4：`num="x"` 不能让请求断连，要变成一条可读的校验错。"""
     mod = load_server()
