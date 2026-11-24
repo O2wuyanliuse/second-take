@@ -58,8 +58,47 @@ def read_receipt(head):
         return None
 
 
+def all_receipts():
+    """回执目录里的全部回执。按 head 精确找不够用——祖先的那份文件名是祖先的 sha。"""
+    d = receipt_dir()
+    if not d.is_dir():
+        return []
+    out = []
+    for p in sorted(d.glob("*.json")):
+        try:
+            out.append(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+    # 按签署时间倒序：拒绝时要报「最近那份为什么不作数」，报最老的那份等于误导。
+    out.sort(key=lambda r: str(r.get("at") or ""), reverse=True)
+    return out
+
+
+def find_covering(head):
+    """找一份能覆盖 HEAD 的回执。返回 (receipt 或 None, 说明)。
+
+    先找 head 精确相等的那份（它最该被信任），再退到「祖先 ＋ 只改版本文件」。
+    两步都看 verdict，宁可报「没有」也不拿一份不通过的回执凑数。
+    """
+    cands = all_receipts()
+    if not cands:
+        return None, "还没有复核回执"
+    for r in cands:
+        if str(r.get("head") or "") == head:
+            ok, why = receipt_covers(r, head)
+            return (r if ok else None), why
+    nearest = []
+    for r in cands:
+        ok, why = receipt_covers(r, head)
+        if ok:
+            return r, why
+        nearest.append(why)
+    return None, (nearest[0] if nearest else "没有一份回执覆盖当前 HEAD")
+
+
 def changed_files(base, head):
-    r = sh("git", "diff", "--name-only", base, head)
+    # quotepath=false：否则中文路径会变成 \347\273\264 这种转义，报给人看等于没说。
+    r = sh("git", "-c", "core.quotepath=false", "diff", "--name-only", base, head)
     if r.returncode != 0:
         return None
     return [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
@@ -186,8 +225,8 @@ def cmd_check(args):
         print("[leak] 待推内容干净（%d 个词）。" % len(words))
 
     head = head_sha()
-    ok, why = receipt_covers(read_receipt(head), head)
-    if not ok:
+    r, why = find_covering(head)
+    if r is None:
         print("")
         print("[停一下] " + why + "。")
         print("  这次的改动得先让人核过，由核的人签字，你才推得出去。")
@@ -195,7 +234,6 @@ def cmd_check(args):
               "--implementer <实施人> --reviewer <复核人>")
         print("  （实施人和复核人必须是两个人：自己写的东西不能自己签。）")
         return 1
-    r = read_receipt(head) or {}
     print("[gate] 复核回执对得上：" + head[:7] + " · 实施 " + str(r.get("implementer"))
           + " · 复核 " + str(r.get("reviewer")) + "（" + why + "）")
     return 0
