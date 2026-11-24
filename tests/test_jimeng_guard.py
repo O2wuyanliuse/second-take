@@ -83,6 +83,31 @@ def post(port, body=b"{}", ctype="application/json", origin=None, length=None):
         conn.close()
 
 
+def get(port, path):
+    conn = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.request("GET", path)
+        r = conn.getresponse()
+        return r.status, r.read()
+    finally:
+        conn.close()
+
+
+def test_prompt_traversal_is_400():
+    """路由层也必须挡，不能只靠「调用方记得用 safe_path」。
+
+    上面那条测的是函数本身；这条测的是 `/api/prompt` 真的调了它——
+    哪天有人图省事把路由改回拼路径，函数还在、门却没了。
+    """
+    mod = load_server()
+    httpd, port = serve(mod)
+    try:
+        status, _ = get(port, "/api/prompt?file=../../../../README.md")
+        assert status == 400, "越界文件名必须 400，不能回 200 空清单"
+    finally:
+        httpd.shutdown()
+
+
 def test_post_rejects_non_json_content_type():
     mod = load_server()
     httpd, port = serve(mod)
