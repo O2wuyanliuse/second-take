@@ -47,7 +47,7 @@ python tools/bootstrap.py --check   # inspect only, writes nothing
 
 **On a clean machine the first command is always `bootstrap.py`, never `--check`**: the workspace does not exist yet, so `--check` will fail — that is "not built yet", not "broken".
 
-`pytest` is optional: without it you can still start, but the "tests" row in the evidence page reads "not run". To cover all three rows: `python -m pip install pytest`.
+`pytest` and `ruff` are optional: without them you can still start, but the "tests" row in the evidence page reads "not run" and CI's `ruff` step cannot be reproduced locally. To match CI: `python -m pip install -r requirements-dev.txt`.
 
 ### 3. Read what it said
 

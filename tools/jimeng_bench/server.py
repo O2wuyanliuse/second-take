@@ -45,6 +45,42 @@ RUNS.mkdir(exist_ok=True)
 HOST = "127.0.0.1"
 PORT = 8765
 
+# 只接受**本机来源**。端口不写死（可以换端口跑，测试也起在 0 端口），但 host 必须是 loopback。
+# 不加这一条，任何网页都能跨站 POST 过来——本地服务开着的时候等于开了个后门，
+# 去掉 dry_run 就是真调 CLI、真花钱（2026-11-24 安全复核 P1）。
+ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+MAX_BODY = 1_000_000          # 1 MB；再大一律 413，不给它吃内存的机会
+PROMPT_EXTS = (".md", ".txt")
+
+
+def origin_ok(origin):
+    """同源请求没有 Origin（curl、GET），放行；有 Origin 就必须是 loopback。"""
+    if not origin:
+        return True
+    try:
+        o = urlparse(origin)
+    except ValueError:
+        return False
+    return o.scheme == "http" and o.hostname in ALLOWED_HOSTS
+
+
+def safe_path(base, name, exts=None):
+    """把用户给的文件名解析到 base 下；越界或后缀不对返回 None。
+
+    用 `resolve() + is_relative_to()`，**不用 startswith**：`runs` 与 `runs2` 前缀相同，
+    startswith 会把兄弟目录一起放进来（2026-11-24 复核实测：`<runs>/../runs2/x.png` 能过）。
+    """
+    try:
+        base = Path(base).resolve()
+        p = (base / name).resolve()
+    except (OSError, ValueError):
+        return None
+    if not p.is_relative_to(base):
+        return None
+    if exts and p.suffix.lower() not in exts:
+        return None
+    return p
+
 # 允许的模型档（写死：默认 5.0，不显式写会静默降档，这是 2026-11-09 实测的坑）
 MODELS = ["5.0Pro", "5.0", "4.7", "4.6", "4.5", "4.1", "4.0"]
 
@@ -163,9 +199,9 @@ def list_prompt_files():
 
 
 def read_prompt_blocks(name):
-    """读一个件里的全部提示词块，按出现顺序编号。"""
-    f = PROJECT / "99_过程稿" / "预告片" / name
-    if not f.exists():
+    """读一个件里的全部提示词块，按出现顺序编号。越界或后缀不对返回 []。"""
+    f = safe_path(PROJECT / "99_过程稿" / "预告片", name, PROMPT_EXTS)
+    if f is None or not f.exists():
         return []
     txt = f.read_text(encoding="utf-8", errors="replace")
     blocks = [b.strip() for b in re.findall(r"```\n(.*?)\n```", txt, re.S)
@@ -251,8 +287,13 @@ def validate(req):
         errs.append("宽高必须是整数")
         return errs
 
-    if not (1 <= int(num) <= 10):
-        errs.append("数量 1–10")
+    try:
+        num_i = int(num)
+    except (TypeError, ValueError):
+        errs.append("数量必须是整数")
+    else:
+        if not (1 <= num_i <= 10):
+            errs.append("数量 1–10")
 
     if reso in LIMITS:
         lo, hi = LIMITS[reso]["side"]
@@ -262,9 +303,7 @@ def validate(req):
         if not (lo <= h <= hi):
             errs.append(f"{reso} 每边像素须在 {lo}–{hi}，当前高 {h}")
         if w * h > cap:
-            errs.append(f"{reso} 总像素上限 {cap}，当前 {w*h} 超了 {w*h-cap}")
-        if w * h > cap:
-            errs.append("（建议换更高的分辨率档，或缩小画幅）")
+            errs.append(f"{reso} 总像素上限 {cap}，当前 {w*h} 超了 {w*h-cap}（换更高分辨率档，或缩小画幅）")
 
     if not (req.get("prompt") or "").strip():
         errs.append("提示词为空")
@@ -406,9 +445,10 @@ class Handler(BaseHTTPRequestHandler):
                 p = p.resolve()
             except Exception:
                 return self._send(400, {"error": "路径不合法"})
-            # 只放行两个目录，防目录穿越
+            # 只放行两个目录，防目录穿越。用 is_relative_to，不用 startswith——
+            # `runs` 与 `runs2` 前缀相同，startswith 会把兄弟目录一起放进来。
             allowed = [RUNS.resolve(), (PROJECT / "99_过程稿").resolve()]
-            if not any(str(p).startswith(str(a)) for a in allowed):
+            if not any(p.is_relative_to(a) for a in allowed):
                 return self._send(403, {"error": "只能读 runs/ 与 99_过程稿/ 下的图"})
             if not p.exists():
                 return self._send(404, {"error": "图不存在"})
@@ -417,14 +457,36 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/prompt":
             q = parse_qs(u.query)
             name = (q.get("file") or [""])[0]
+            if safe_path(PROJECT / "99_过程稿" / "预告片", name, PROMPT_EXTS) is None:
+                return self._send(400, {"error": "文件名不合法（只收该目录下的 .md/.txt）"})
             return self._send(200, {"blocks": read_prompt_blocks(name)})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        # 兜底：没被下面的分支挡住的异常，回一个 JSON 500，
+        # 别让客户端只看到「网络错误」（2026-11-24 复核 P4）。
+        try:
+            self._handle_post()
+        except Exception as e:
+            self._send(500, {"error": f"服务端内部错误：{e}"})
+
+    def _handle_post(self):
+        # 来源与类型：挡跨站，也挡掉 text/plain 这种「免预检的简单请求」。
+        if not origin_ok(self.headers.get("Origin")):
+            return self._send(403, {"error": "只接受本机页面发来的请求"})
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if ctype != "application/json":
+            return self._send(415, {"error": "只接受 application/json"})
+
         u = urlparse(self.path)
         if u.path != "/api/generate":
             return self._send(404, {"error": "not found"})
-        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self._send(400, {"error": "Content-Length 不合法"})
+        if n > MAX_BODY:
+            return self._send(413, {"error": "请求体过大（上限 1 MB）"})
         try:
             req = json.loads(self.rfile.read(n).decode("utf-8"))
         except Exception as e:

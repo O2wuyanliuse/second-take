@@ -47,7 +47,7 @@ python tools/bootstrap.py --check   # 只查不写盘
 
 **干净机器上第一条永远是 `bootstrap.py`，不是 `--check`**：工作区还没建，`--check` 当然红——那是「还没建」，不是「装坏了」。
 
-`pytest` 是可选的：不装也能开工，只是证据页里「用例」那一行写「未跑」。想三项全跑：`python -m pip install pytest`。
+`pytest` 与 `ruff` 是可选的：不装也能开工，只是证据页里「用例」那一行写「未跑」、CI 的 `ruff` 那关本地复现不出来。想和 CI 一样多：`python -m pip install -r requirements-dev.txt`。
 
 ### 第 3 步：看它说了什么
 
