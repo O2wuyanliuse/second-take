@@ -11,6 +11,33 @@
 备链是**源码包**（下下来自己跑 `packaging/_pack.py` 打包），实测 0.53s，比任何镜像都快。某个域名抽风时不至于断。
 主链不通时先给人备链，**别让人卡在「下不到」这一步**——2026-11-17 就卡过一次。
 
+## v1.0.2 · 2026-11-24
+
+本版做了基于 AI 产出的安全性优化：本地桥接服务补上来源、类型、体积、路径四道门，跨站页面不能再往里塞东西。
+
+### 对你有影响
+
+1. 本地出图服务加了四道门
+2. 跨站页面不能再触发它
+3. 不用重装，覆盖解压即可
+
+### 没动什么
+
+- **判据的阈值一条没改。** 改的是 `server.py` 的入口校验；门禁、发布判据、打包流程都没碰。
+- **1.0.1 的包不重打。** 同号两个二进制，比多一个版本号更难解释。
+
+### 内部（用户不用看）
+
+<details>
+<summary>展开</summary>
+
+- **为什么发 1.0.2**：1.0.1 的包打在 `1235c1f`，里面 `server.py` 还没设防——任意网页一句 `fetch` 就能 `POST /api/generate`，去掉 `dry_run` 就是真调 CLI、真花钱。四道门是 `7d55aca` 才有的，没进 1.0.1 的包。
+- **改了什么**：①`Origin` 必须 loopback（端口不绑死）＋`Content-Type` 必须 `application/json`；②`/api/prompt` 与 `/api/image` 统一走 `safe_path()`（`resolve` ＋ `is_relative_to` ＋ 后缀白名单）；③请求体超 1 MB 在 `read` 之前 413；④`int(num)` 捕获，`do_POST` 整体包 500 兜底；⑤`Origin` 放行 https 回环。
+- **附带**：`ci.yml` ⑤ 在 fork PR 上跳过（拿不到 secret）；CI 装依赖改读 `requirements-dev.txt`。
+- **验收**：`pytest -q` 74 passed；`gate/_gate.py` 19 项不变；`verify_release` 九项绿；`sec_surface.py` 全绿；包内 `server.py` 四道门在。
+
+</details>
+
 ## v1.0.1 · 2026-11-23
 
 ### 对你有影响
