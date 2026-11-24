@@ -62,7 +62,18 @@ jobs:
         run: python gate/_links.py
       # ⑤ 词表**不在仓库里**（它必须写出要禁的词，留在库里等于自泄一次）。
       #    CI 从仓库 secret 注入到 .ci/（已 gitignore）；secret 空＝这一项没查成，判红。
+      #    **fork 来的 PR 例外**：它拿不到本仓 secret，这一项必然「没查成」。
+      #    让它红，等于「所有外部 PR 都合不进来」——关掉的是门，不是漏洞；伤的是
+      #    「宣称开源、但谁提 PR 都红」。所以跳过，并在 summary 里明说没查（跳过≠通过）。
+      #    条件写成「非 PR 或同仓 PR」而不是「push 或同仓 PR」：workflow_dispatch
+      #    手动触发也要照常跑，别让它被漏在门外。
+      - name: ⑤ 说明（fork PR 拿不到 secret，这一项会跳过）
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "⑤ 脱敏：**这一项没查**——fork 来的 PR 拿不到本仓 secret。" >> "$GITHUB_STEP_SUMMARY"
+          echo "这不是通过，是权限边界；词表本身不在仓库里，fork 侧也没有。" >> "$GITHUB_STEP_SUMMARY"
       - name: ⑤ 脱敏（词表从 secret 注入，只看当前树）
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         shell: bash
         run: |
           mkdir -p .ci
