@@ -198,6 +198,13 @@ def run_init(root):
     try:
         import status as _status          # 同目录的 tools/status.py
 
+        # 先落一份报告占位，再 render：render 里的链接检查会看 workspace/开工报告.md
+        # 在不在，第一次解压时它还不存在，四处链接就全断（2/19 而不是 3/19）。
+        # 只动这一处：占位先写，拿到 lines 之后再写真的。
+        try:
+            _status.write_report(REPO, [])
+        except Exception as e:
+            say("  （占位报告没写成，首屏可能少一项；原因: %s）" % e)
         lines = _status.render(REPO)
         for ln in lines:
             say("  " + ln)

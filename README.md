@@ -47,7 +47,7 @@ python tools/bootstrap.py --check   # 只查不写盘
 
 **干净机器上第一条永远是 `bootstrap.py`，不是 `--check`**：工作区还没建，`--check` 当然红——那是「还没建」，不是「装坏了」。
 
-`pytest` 与 `ruff` 是可选的：不装也能开工，只是证据页里「用例」那一行写「未跑」、CI 的 `ruff` 那关本地复现不出来。想和 CI 一样多：`python -m pip install -r requirements-dev.txt`。
+`pytest` 与 `ruff` 是可选的：不装也能开工。用例与 CI 依赖属于维护件，不随包发——想跑就照仓库页做。
 
 ### 第 3 步：看它说了什么
 
@@ -77,10 +77,8 @@ python tools/bootstrap.py --check   # 只查不写盘
 | `shapes/` | 空的判据／环节／交接表格。题目，可只拿一份 |
 | `rules/` | 判据的「形状」公开、「绑定」不外发；没绑定会明确报「不算绿」 |
 | `skills/` | 两个可直接加载的 skill：主流水线、角色三视图；装法与叫法写在各自 SKILL.md 顶部的「怎么装」 |
-| `packaging/` | 打包与脱敏（含查重、验包三道闸）＋给你自己项目用的空模板 |
 | `tools/` | `bootstrap.py` 装、`status.py` 看进度、`doctor.py` 体检、`evidence.py` 存证据；另有批跑面板与资产度量 |
-| `docs/` | 维护者文档：发版五步（`docs/maintain/维护方法.md`）、升级与回滚（`docs/upgrade.md`） |
-| `tests/` | 检查器自己的用例：`python -m pytest -q` |
+| `docs/` | 升级与回滚（`docs/upgrade.md`）；发版流程属维护件，在仓库页 |
 
 想按环节读，入口是 `Agent框架/00_主轴_按环节读_v1.md`；不知道从哪读，看 `INDEX.md`。
 
@@ -97,7 +95,7 @@ python tools/bootstrap.py --check   # 只查不写盘
 - **不联网、没有遥测、不读你机器上别处的东西**；要装的只有 Python。
 - 想知道**现在走到哪、会不会绊**：`python tools/status.py`——只说人话：覆盖率、风险、下一步；永远退 0（镜子不是门，它不拦你）。
 - 想知道**这个仓库与工作区**什么状态：`python tools/doctor.py`（六行：python／git／版本／工作区／配置／上次证据）。
-- 想知道**自己有没有把不该发的东西发出去**：`packaging/_leakscan.py --words <你的词表>`。本库不带词表——词表本身就会把那些词写出来一遍，所以它属于你的项目，不在这里。
+- 想知道**自己有没有把不该发的东西发出去**：脱敏与打包属维护件，不随包发——去仓库页取。本库从不带词表：词表本身就会把那些词写出来一遍，所以它属于你的项目。
 
 ## 边界与免责
 
@@ -124,4 +122,4 @@ python tools/bootstrap.py --check   # 只查不写盘
 
 ## 贡献
 
-欢迎 Issue 与 PR，先读 `CONTRIBUTING.md`（有一条关于改动的授权条款）；行为准则三行：`CODE_OF_CONDUCT.md`。
+欢迎 Issue 与 PR：行为准则三行在包内 `CODE_OF_CONDUCT.md`；贡献规则（含版权条款）在仓库页上。

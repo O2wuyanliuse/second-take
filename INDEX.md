@@ -1,6 +1,6 @@
 # INDEX · 我该读哪一份
 
-> **English:** Map of this repository — what to read for which task. The Chinese table is normative. To start working, `开工提示词.md` is enough; `docs/maintain/维护方法.md` is only for changing the release process.
+> **English:** Map of this repository — what to read for which task. The Chinese table is normative. To start working, `开工提示词.md` is enough; the release process is maintainer-only and lives on the repository page.
 
 一张给人和 AI 共用的地图。只有这一页是从头看到尾的，其余按需取。
 
@@ -14,7 +14,6 @@
 | 装不上 / 卡住 | `README.md` 的「三步开工」→ `python tools/doctor.py` |
 | 证明真的跑过 | `python tools/evidence.py`，结果写在 `reports/` 下的 `evidence.md` |
 | 升级到新版 / 回到旧版 | `docs/upgrade.md` |
-| 改维护流程（发版、判据、词表） | `docs/maintain/维护方法.md` |
 | 看历史 | `CHANGELOG.md` |
 | 看这个库到底不是什么 | `README.md` 的「边界与免责」 |
 

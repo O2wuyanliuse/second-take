@@ -10,6 +10,9 @@
 """
 
 import importlib.util
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -23,14 +26,23 @@ def load_evidence():
     return mod
 
 
-def fake_repo(tmp_path, *skip):
-    """最小骨架：两条命令的脚本路径存在即可，内容无所谓（run_cmd 已被替换）。"""
+def fake_repo(tmp_path, *skip, with_tests=True):
+    """最小骨架：两条命令的脚本路径存在即可，内容无所谓（run_cmd 已被替换）。
+
+    `with_tests=False` 造的是「用户包」的形状：有 tools/ 和 gate/，没有 tests/。
+    `tests/` 存在与否会改变 collect() 的分支，默认必须有——否则存量用例会
+    悄悄走成「包里没 tests」那条路。
+    """
     for rel in ("tools/bootstrap.py", "gate/_gate.py"):
         if rel in skip:
             continue
         p = tmp_path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("# 占位\n", encoding="utf-8")
+    if with_tests:
+        (tmp_path / "tests").mkdir(exist_ok=True)
+        (tmp_path / "tests" / "test_placeholder.py").write_text(
+            "def test_ok():\n    assert True\n", encoding="utf-8")
     return tmp_path
 
 
@@ -175,3 +187,46 @@ def test_report_marks_skipped_row(tmp_path, monkeypatch):
     assert "未跑：未安装 pytest" in text
     assert "| — |" in text
     assert "2/3" in text
+
+
+def test_package_without_tests_dir_exits_zero(tmp_path):
+    """用户包里没有 tests/ 时，`python tools/evidence.py` 不许退 1。
+
+    包里只放用户要跑的东西，tests/ 是维护件、进不了包。旧逻辑照样去跑 pytest，
+    拿到「no tests ran」退 5，整页记红——刚解压的人会以为包是坏的。
+    这里真起子进程跑脚本（不换 REPO、不换 run_cmd），钉的就是退出码本身。
+    """
+    root = fake_repo(tmp_path, with_tests=False)
+    shutil.copy2(REPO / "tools" / "evidence.py", root / "tools" / "evidence.py")
+
+    r = subprocess.run(
+        [sys.executable, str(root / "tools" / "evidence.py"), "--out", "reports/evidence.md"],
+        cwd=str(root), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    assert r.returncode != 1, r.stdout + r.stderr
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    text = (root / "reports" / "evidence.md").read_text(encoding="utf-8")
+    assert "用例未随包发" in text
+
+
+def test_package_with_empty_tests_dir_exits_zero(tmp_path):
+    """包里被人手建了一个**空** tests/：也不许记红（2026-11-25 实测退 5）。
+
+    判据是「有没有用例文件」，不是「目录在不在」。空目录是最容易出现的形状——
+    用户照某篇教程 mkdir 一下就有了，pytest 仍然「no tests ran」退 5。
+    """
+    root = fake_repo(tmp_path, with_tests=False)
+    (root / "tests").mkdir()
+    shutil.copy2(REPO / "tools" / "evidence.py", root / "tools" / "evidence.py")
+
+    r = subprocess.run(
+        [sys.executable, str(root / "tools" / "evidence.py"), "--out", "reports/evidence.md"],
+        cwd=str(root), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    text = (root / "reports" / "evidence.md").read_text(encoding="utf-8")
+    assert "用例未随包发" in text

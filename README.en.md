@@ -47,7 +47,7 @@ python tools/bootstrap.py --check   # inspect only, writes nothing
 
 **On a clean machine the first command is always `bootstrap.py`, never `--check`**: the workspace does not exist yet, so `--check` will fail — that is "not built yet", not "broken".
 
-`pytest` and `ruff` are optional: without them you can still start, but the "tests" row in the evidence page reads "not run" and CI's `ruff` step cannot be reproduced locally. To match CI: `python -m pip install -r requirements-dev.txt`.
+`pytest` and `ruff` are optional: you can start without them. The test suite and CI dependencies are maintainer-only and not shipped with the package — see the repository page if you want to run them.
 
 ### 3. Read what it said
 
@@ -77,10 +77,8 @@ Stuck or nothing comes out: [open an Issue](https://github.com/O2wuyanliuse/seco
 | `shapes/` | Empty criteria / step / handoff forms. Take one, fill it with your own rules |
 | `rules/` | The *shape* of a criterion is public; the *binding* is not. Unbound reports "not green" |
 | `skills/` | Two loadable skills: the main pipeline and character turnaround; install and invoke lines sit at the top of each SKILL.md |
-| `packaging/` | Packing and de-identification (leak scan, duplicate check, package verify) plus blank templates for your own project |
 | `tools/` | `bootstrap.py` installs, `status.py` shows progress, `doctor.py` health-checks, `evidence.py` stores proof; plus a batch panel and asset measurement |
-| `docs/` | Maintainer docs: the five release steps (`docs/maintain/维护方法.md`), upgrade and rollback (`docs/upgrade.md`) |
-| `tests/` | The checkers' own test suite: `python -m pytest -q` |
+| `docs/` | Upgrade and rollback (`docs/upgrade.md`); the release process is maintainer-only and lives on the repository page |
 
 To read by pipeline stage, start at `Agent框架/00_主轴_按环节读_v1.md`; if you don't know where to start, open `INDEX.md`.
 
@@ -97,7 +95,7 @@ If you disagree with these, the rest will feel wrong:
 - **No network, no telemetry, no reading elsewhere on your machine**; Python is the only thing to install.
 - Want to know **where you are and what will trip you**: `python tools/status.py` — plain language only: coverage, risks, next steps; it always exits 0 (a mirror, not a gate — it never blocks you).
 - Want to know **the state of this repository and workspace**: `python tools/doctor.py` (six lines: python / git / version / workspace / config / last evidence).
-- Want to know **whether you shipped something you shouldn't have**: `packaging/_leakscan.py --words <your wordlist>`. This repository ships no wordlist — a wordlist spells out the words it bans, so it belongs to your project, not here.
+- Want to know **whether you shipped something you shouldn't have**: de-identification and packing are maintainer-only and not shipped with the package — get them from the repository page. This library never ships a wordlist: a wordlist spells out the words it bans, so it belongs to your project.
 
 ## Boundaries
 
@@ -124,4 +122,4 @@ Out of scope: any novel text, character settings, or media files. This repositor
 
 ## Contributing
 
-Issues and PRs are welcome. Read `CONTRIBUTING.md` first (there is a licensing clause) and `CODE_OF_CONDUCT.md` (three lines).
+Issues and PRs are welcome. The code of conduct (three lines) is in the package as `CODE_OF_CONDUCT.md`; the contribution rules, including the licensing clause, live on the repository page.

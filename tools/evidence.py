@@ -95,6 +95,16 @@ def key_line(rc, text, ok):
     return lines[-1][:120]
 
 
+def has_test_files():
+    """用例目录在、且里面真有 test_*.py。
+
+    只看用例目录在不在不够：收包人手边建一个空目录，pytest 照样
+    「no tests ran」退 5，红纸照旧（2026-11-25 实测）。判据是有没有用例文件。
+    """
+    d = REPO / "tests"
+    return d.is_dir() and any(d.glob("test_*.py"))
+
+
 def collect(skip_tests=False):
     """顺序跑三条，逐条记录。返回行列表（顺序即执行顺序）。
 
@@ -109,6 +119,18 @@ def collect(skip_tests=False):
         if skip_tests and label == "用例":
             continue
         idx += 1
+
+        # 用户包里不带用例目录（维护件不进包）。这时候起 pytest 只会得到
+        # 「no tests ran」退 5，对刚解压的人就是一张假红——本页最该避免的事。
+        # 所以先看有没有用例文件（目录在但空着，同样记这一条），不进子进程。
+        if label == "用例" and not has_test_files():
+            rows.append({
+                "idx": idx, "label": label, "cmd": "python " + " ".join(argv),
+                "rc": None, "ok": ok, "secs": 0.0, "skipped": True,
+                "why": "用例未随包发", "out": "",
+                "key": "用例未随包发（跳过）",
+            })
+            continue
 
         if label == "用例" and not pytest_available():
             rows.append({

@@ -6,18 +6,15 @@
 # 格式：一行一个路径或通配（* / ** / ?）；`!` 开头是排除；`#` 注释。
 # 判据：build_public_package.py 只按本清单打包；verify_release.py 再扫包内。
 #
-# 本清单生成自 HEAD 的 137 个跟踪文件，已剔除 packaging/public_denylist.txt
-# （禁用词表是敏感件：它必须写出要禁的词，所以它不进包、也不该留在公库里）
-
+# 2026-11-25 定：发布包只发用户包，维护件一律不进包的顶层。
+# 这次去掉的 45 项按组列（不写总数，数由清单自己数）：
+#   .github 下 6 项（issue 模板 3 份、PR 模板、两个 workflow）
+#   .mailmap、CONTRIBUTING.md、docs/maintain/ 下 1 份
+#   packaging/ 19 项（含 templates 下 7 份空模板）
+#   tests/ 11 项（检查器自己的用例）
+#   发版链 6 支工具：build_public_package.py、check_bilingual.py、check_maintenance.py、release.py、seal.py、verify_release.py
 .gitattributes
-.github/ISSUE_TEMPLATE/bug_report.md
-.github/ISSUE_TEMPLATE/config.yml
-.github/ISSUE_TEMPLATE/suggestion.md
-.github/pull_request_template.md
-.github/workflows/ci.yml
-.github/workflows/release.yml
 .gitignore
-.mailmap
 links_scope.json
 AGENTS.md
 Agent框架/00_主轴_按环节读_v1.md
@@ -56,7 +53,6 @@ Agent框架/环节表_文字到可视化_v1.md
 Agent框架/目标参照表_v1.md
 CHANGELOG.md
 CODE_OF_CONDUCT.md
-CONTRIBUTING.md
 INDEX.md
 LICENSE
 LICENSE-DOCS
@@ -65,7 +61,6 @@ README.md
 SECURITY.md
 VERSION
 config.example.json
-docs/maintain/维护方法.md
 docs/upgrade.md
 gate/_e0.py
 gate/_gate.py
@@ -77,25 +72,6 @@ gate/_redline.py
 gate/links_allow.txt
 gate_profile.json
 latest.json
-packaging/_doctor.py
-packaging/_dupcheck.py
-packaging/_leakscan.py
-packaging/_nounlist.py
-packaging/_pack.py
-packaging/_pr_guard.py
-packaging/_quote_scan.py
-packaging/_sync_check.py
-packaging/_triage.py
-packaging/_verify_package.py
-packaging/leak_allow.txt
-packaging/templates/README.md
-packaging/templates/gitignore
-packaging/templates/发布前检查清单.md
-packaging/templates/常量台账.md
-packaging/templates/版权与开源红线.md
-packaging/templates/跟进通道.md
-packaging/templates/项目配置_空模板.json
-packaging/脱敏词表_样例.txt
 redline.json
 ruff.toml
 rules/README.md
@@ -132,33 +108,18 @@ templates/checks/_orphan.py
 templates/checks/checks.config.example.json
 templates/ref_roles.md
 templates/镜表示例.md
-tests/conftest.py
-tests/helpers.py
-tests/test_bootstrap.py
-tests/test_doctor.py
-tests/test_evidence.py
-tests/test_latest.py
-tests/test_leakscan.py
-tests/test_links.py
-tests/test_maintenance.py
-tests/test_release.py
-tests/test_status.py
+templates/start/跟进通道.md
+templates/start/常量台账.md
 tools/_keyout.py
 tools/_mkview.py
 tools/_mkview_flow.py
 tools/asset_measure.py
 tools/bootstrap.py
-tools/build_public_package.py
-tools/check_bilingual.py
-tools/check_maintenance.py
 tools/doctor.py
 tools/evidence.py
 tools/jimeng_bench/server.py
 tools/jimeng_bench/ui/index.html
-tools/release.py
-tools/seal.py
 tools/status.py
-tools/verify_release.py
 剪辑引导.md
 发布前检查清单.md
 开工提示词.md

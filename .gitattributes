@@ -20,9 +20,6 @@
 *.mov   binary
 *.zip   binary
 
-# ── 不进发行包（git archive 的 export-ignore，发版时自动排除）──
-# 为什么用这里而不是 `packaging/_pack.py` 的清单：发版走的是 `git archive HEAD`，
-# 它只认 export-ignore，**不读任何脚本里的排除清单**。0.4.0 的包实测带了这两份
-# （各 19KB／16KB），就是清单写了但没生效——「文档说要，机器不查」的第五次。
-Agent框架/13_外部环节接入契约_v0.1.md export-ignore
-Agent框架/同步防断_v1.md export-ignore
+# ── 进不进包，只由 publish_manifest.txt 决定（这份文件不再管包内容）──
+# 0.4.x 曾用 export-ignore 兜底；11-21 这两份中性化后进了清单，两条路打架的历史到此为止。
+# 别再往这里加 export-ignore——要控制包内容，改清单。
