@@ -42,9 +42,37 @@ def _bare_except(fn, lines):
         return True
     if isinstance(fn.type, ast.Name) and fn.type.id == "Exception":
         if len(fn.body) == 1 and isinstance(fn.body[0], ast.Pass):
-            following = lines[fn.end_lineno:fn.end_lineno + 1]
-            return not any("# 吞：" in l for l in following)
+            pass_line = lines[fn.body[0].lineno - 1]
+            return "# 吞：" not in pass_line
     return False
+
+
+def _function_fingerprint(fn):
+    """同名之外再比 AST：参数、返回标注与剥掉 docstring 的函数体。"""
+    body = list(fn.body)
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        body = body[1:]
+    return (
+        ast.dump(fn.args, include_attributes=False),
+        ast.dump(fn.returns, include_attributes=False) if fn.returns else "",
+        ast.dump(ast.Module(body=body, type_ignores=[]), include_attributes=False),
+    )
+
+
+def _duplicate_issues(seen):
+    issues = []
+    for name, variants in seen.items():
+        if name == "main":
+            continue
+        for locs in variants.values():
+            if len({rel for rel, _, _, _ in locs}) < 2:
+                continue
+            if any(marked and rel.startswith("templates/checks/") for rel, _, marked, _ in locs):
+                continue
+            for rel, ln, marked, _ in locs:
+                if not marked:
+                    issues.append(f"{rel}:{ln}: 同名同体函数 {name} 跨文件重复，未标 故意重复")
+    return issues
 
 
 def _load_manifest():
@@ -61,7 +89,7 @@ def _load_manifest():
 
 def main():
     issues = []
-    seen = defaultdict(list)
+    seen = defaultdict(lambda: defaultdict(list))
     for p in _iter_files():
         rel = p.relative_to(ROOT).as_posix()
         text = p.read_text(encoding="utf-8")
@@ -82,16 +110,11 @@ def main():
                 elif fn.name != "main" and n > 300:
                     issues.append(f"{rel}:{fn.lineno}: {fn.name} {n} 行 > 300")
                 if not fn.name.startswith("test") and fn.name != "__init__":
-                    seen[fn.name].append((rel, fn.lineno, _marked_duplicate(fn, lines)))
+                    seen[fn.name][_function_fingerprint(fn)].append((rel, fn.lineno, _marked_duplicate(fn, lines), fn))
         for node in ast.walk(tree):
             if _bare_except(node, lines):
                 issues.append(f"{rel}:{node.lineno}: 裸 except Exception: pass 未写吞的理由")
-    for name, locs in seen.items():
-        if len(locs) < 2 or name == "main":
-            continue
-        for rel, ln, marked in locs:
-            if not marked:
-                issues.append(f"{rel}:{ln}: 同名函数 {name} 跨文件重复，未标 故意重复")
+    issues.extend(_duplicate_issues(seen))
     count = _load_manifest()
     if count is not None:
         try:

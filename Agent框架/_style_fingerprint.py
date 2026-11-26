@@ -1,26 +1,13 @@
 # -*- coding: utf-8 -*-
 """_style_fingerprint.py · 文笔结构指纹（通用层工具）
 
-它干什么
-    把「人机味」拆成几项**结构指标**，拿某个作者自己的原文当基线，再拿新稿去比。
-    只测结构，不测好坏——**指标全绿也可能写得烂**。
-
-它为什么存在
-    作者 2026-10-29 02:20 点破：续写最难的不是逻辑（框架会填），是文笔统一——
-    「为了自洽，你写的东西过于方便自己通过；但读者容易一眼人机」。
-
-    "像不像"不能靠 AI 自评（自评必然给自己放水）。所以把判断挪到可数的东西上。
-    完整方法论见 `06_数据采集与迭代规范.md` → `四·补一 文笔校准`（**待验**）。
-
-一条硬规矩
-    **阈值不许写死。** 每个作者基线不同（实测一位作者「四字整句」0.47，AI 稿普遍 1.8–3.8 倍）。
-    所以必须 `--base` 先算这个人的基线，再比。拿固定阈值套所有人，是在制造新的"人机味"。
-
 用法
     python _style_fingerprint.py --base 原文.txt
     python _style_fingerprint.py --base 原文目录/ --check 新稿.md
     python _style_fingerprint.py --base a.txt --base b.txt --check 新稿.md    # 多文件累加
     python _style_fingerprint.py --base 原文.txt --check 新稿.md --json       # 机器可读
+
+完整说明：docs/maintain/代码内长文档/Agent框架/_style_fingerprint.py.md
 """
 
 import io
@@ -103,12 +90,7 @@ WARN = {
 }
 
 
-def main():
-    argv = sys.argv
-    if "--base" not in argv:
-        print(__doc__)
-        return 1
-
+def _parse_cli(argv):
     bases, checks = [], []
     cur = None
     for a in argv[1:]:
@@ -120,35 +102,10 @@ def main():
             cur = None
         elif cur is not None:
             cur.append(a)
+    return bases, checks
 
-    bfiles = collect(bases)
-    if not bfiles:
-        print("❌ 没找到基线文件")
-        return 1
-    btext = "\n".join(io.open(f, encoding="utf-8", errors="ignore").read() for f in bfiles)
-    base = metrics(btext)
-    if not base:
-        print("❌ 基线文本太短（至少 500 字才稳）")
-        return 1
 
-    result = {"base_files": [os.path.basename(f) for f in bfiles],
-              "base_chars": len(btext), "baseline": base}
-
-    ctext, cname = None, None
-    cfiles = collect(checks)
-    if cfiles:
-        ctext = "\n".join(io.open(f, encoding="utf-8", errors="ignore").read() for f in cfiles)
-        cname = "、".join(os.path.basename(f) for f in cfiles)
-
-    if "--json" in argv:
-        if ctext:
-            m = metrics(ctext)
-            result["check"] = {"files": [os.path.basename(f) for f in cfiles], "metrics": m}
-            if m:
-                result["ratio"] = {k: round(m[k] / base[k], 2) for k in base if base[k]}
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
-
+def _print_report(result, base, btext, ctext, cname):
     print("文笔结构指纹 · 基线")
     print("  来源：%s（%d 字）" % ("、".join(result["base_files"]), len(btext)))
     print()
@@ -190,6 +147,46 @@ def main():
     print()
     print("  ⚠ 指标绿了不等于写得好。这只拦\"一眼人机\"，拦不住\"平庸\"。")
     return 0
+
+
+def main():
+    argv = sys.argv
+    if "--base" not in argv:
+        print(__doc__)
+        return 1
+
+    bases, checks = _parse_cli(argv)
+
+    bfiles = collect(bases)
+    if not bfiles:
+        print("❌ 没找到基线文件")
+        return 1
+    btext = "\n".join(io.open(f, encoding="utf-8", errors="ignore").read() for f in bfiles)
+    base = metrics(btext)
+    if not base:
+        print("❌ 基线文本太短（至少 500 字才稳）")
+        return 1
+
+    result = {"base_files": [os.path.basename(f) for f in bfiles],
+              "base_chars": len(btext), "baseline": base}
+
+    ctext, cname = None, None
+    cfiles = collect(checks)
+    if cfiles:
+        ctext = "\n".join(io.open(f, encoding="utf-8", errors="ignore").read() for f in cfiles)
+        cname = "、".join(os.path.basename(f) for f in cfiles)
+
+    if "--json" in argv:
+        if ctext:
+            m = metrics(ctext)
+            result["check"] = {"files": [os.path.basename(f) for f in cfiles], "metrics": m}
+            if m:
+                result["ratio"] = {k: round(m[k] / base[k], 2) for k in base if base[k]}
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    return _print_report(result, base, btext, ctext, cname)
+
 
 
 if __name__ == "__main__":

@@ -27,20 +27,13 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import sha256_of
+
 try:
     from verify_release import find_git  # 同目录，复用同一套 git 探测
 except Exception:
     def find_git(explicit=None):
         return explicit or "git"
-
-
-def sha256_of(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
 
 def count_files(zip_path):
     with zipfile.ZipFile(zip_path) as z:

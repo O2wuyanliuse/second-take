@@ -1,27 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-即梦出图工作台 · 甲档
-=====================
+"""即梦出图工作台 · 甲档
 
-只做三件事，别的都不做：
-
-  1. 参数摆出来（表单即公示，判据书 J-33）
-  2. 调 dreamina CLI 出图，参数锁死、写错不给跑
-  3. 跑完自动算尺寸／四角／净版，生成 A 段 B 段文本（复制即用）
-
-设计约束
---------
-· 只用标准库 + Pillow，不装任何依赖
-· 只监听 127.0.0.1
-· **不自动写台账**：只生成可复制的文本片段，由人贴进去。
-  自动写会绕过人的复核，而台账是「先有判据再花钱」的凭证，不能机器说了算。
-· 参考强度：CLI 没有这个参数，界面上明确写「N/A」，不做假滑块。
-
-跑法
-----
-    cd tools/jimeng_bench
-    python server.py
-    浏览器打开 http://127.0.0.1:8765
+完整说明：docs/maintain/代码内长文档/tools/jimeng_bench/server.py.md
 """
 
 import json
@@ -386,8 +366,7 @@ def do_generate(req):
         if m:
             queue_name = m.group(1)
     except Exception:
-        pass
-        # 吞：queue_name 只是可选调试字段，解析失败仍返回空串。
+        pass  # 吞：queue_name 只是可选调试字段，解析失败仍返回空串。
 
     return {
         "ok": True, "batch": batch, "submit_id": submit_id,

@@ -99,18 +99,7 @@ def rewrite_names(src, mapping):
     return "\n".join(lines)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--to", required=True)
-    ap.add_argument("--names", required=True)
-    ap.add_argument("--inject", default="")
-    ap.add_argument("--apply", action="store_true")
-    args = ap.parse_args()
-
-    text, tree = load()
-    defs = top_defs(tree)
-    names_all = set(defs)
-
+def _dependency_graph(tree, defs):
     # 每个顶层定义分别被谁用到：函数看自由名字，常量看右值里读了谁。
     #   2026-11-17 修：首版只算了函数→名字，漏掉「常量读常量」（如 `RETIRED_SKIP = SKIP + …`），
     #   于是闭包算不出来，搬到一半 `NameError`。**常量也是使用者。**
@@ -133,13 +122,10 @@ def main():
                 reads["const:" + t] = f
                 for d in f:
                     users.setdefault(d, set()).add("const:" + t)
+    return users, reads
 
-    targets = [x.strip() for x in args.names.split(",") if x.strip()]
-    missing = [t for t in targets if t not in defs]
-    if missing:
-        print("找不到：", missing)
-        return 2
 
+def _move_closure(targets, users, reads, defs):
     moved = set(targets)
     def _u(n):
         # 使用者的名字里带 `const:` 前缀的要还原成常量名
@@ -154,6 +140,30 @@ def main():
                 if _u(dep) - moved == set():
                     moved.add(dep)
                     changed = True
+    return moved
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--to", required=True)
+    ap.add_argument("--names", required=True)
+    ap.add_argument("--inject", default="")
+    ap.add_argument("--apply", action="store_true")
+    args = ap.parse_args()
+
+    text, tree = load()
+    defs = top_defs(tree)
+    names_all = set(defs)
+
+    users, reads = _dependency_graph(tree, defs)
+
+    targets = [x.strip() for x in args.names.split(",") if x.strip()]
+    missing = [t for t in targets if t not in defs]
+    if missing:
+        print("找不到：", missing)
+        return 2
+
+    moved = _move_closure(targets, users, reads, defs)
 
     # 注入点：除了命令行给的，永远加上 `_core` 里的固定几样
     #   （2026-11-17 修：首版只按命令行改写，搬到 `P2.append` 当场 NameError）

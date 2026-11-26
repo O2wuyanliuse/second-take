@@ -2,17 +2,6 @@
 # -*- coding: utf-8 -*-
 """通用层实例残留检查（提示档，**不进 gate**）。
 
-判据只有一条：**「换一部小说、换一个平台，这句话还成立吗？」**
-不成立的（某个项目的格数、镜数、秒数、专有细节）就不该待在通用层。
-
-但这条判据机器判不全，所以这里只做两件**低误报**的事：
-
-1. **裸数字**：`23 格`、`103 镜`、`39 秒` 这种既没区间也没「约」的数字 → 提示。
-   规范数字（`24–36 格`、`60–90 秒`）整行带 `–`／`~`／`约`／`到`／`至`，直接跳过。
-   带 `≤`／`最多`／`上限` 的也跳过——那是平台限制，不是项目样本。
-2. **专名表**：`.ci/project_names.txt` 一行一个词，命中 → 红。
-   词表与脱敏词表一样**不进库**（它写的就是要防的名字）。
-
 退出码：**默认 0**（只打印，不拦）；`--strict` 时有命中退 1。
 为什么默认不拦：清单稳定之前硬拦，人会开始忽略它——那比不查更坏。
 行内写 `[scope-ok]` 可单条豁免（理由写在行尾）。
@@ -20,6 +9,8 @@
 用法：
     python packaging/_scope_check.py
     python packaging/_scope_check.py --strict
+
+完整说明：docs/maintain/代码内长文档/packaging/_scope_check.py.md
 """
 
 import argparse
@@ -31,8 +22,7 @@ for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 ROOT = Path(__file__).resolve().parent.parent
 

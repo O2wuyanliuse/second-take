@@ -1,62 +1,12 @@
 # -*- coding: utf-8 -*-
 """_gate.py · 汇总报告（原「收工总闸」）
 
-定位（2026-10-30 改）
-    **本文件不再是唯一的检查入口。**
+用法：python gate/_gate.py [--quiet|--each|--verbose] [--full] [--brief]
+  --quiet  默认两行结论；--each 逐项结论；--verbose 全量输出。
+  --full   加跑判据自检；--brief 汇总正文但缩短跟进通道。
+退出码：0 通过；1 有阻断；2 有提示；3 安装未完成。
 
-    原定位是「一条命令跑完三件事，省得记今天该跑哪个」。问题在于：这么改之后，
-    **总闸自己又变成了"要记得跑"的东西**——漏检没被消除，只是换了个地方。
-    而它跑的三个里，_collab 与 _lint 本来就天天在 pre-commit 里跑，
-    真正只有它管的只剩 _world 一项（判索引层与正文脱钩，最重的一类错）。
-
-    2026-10-30 的处置：把 _world 挪进 pre-commit，让它在**绕不过去的路径**上跑。
-    本文件从此退成一份**给人看的汇总报告**——一次列完三类结论 + 跟进通道状态。
-    **跑不跑都不影响正确性。** 这正是它该待的位置。
-
-    仍然值得跑的两个理由：
-      1. 汇总：不用逐个跑八个脚本，一次看完
-      2. 通道横幅：把「开着的条目」摆到视野里——pre-commit 不打印这个
-
-为什么十项全跑（2026-11-01 从三项扩到七项；同日补 _const→八项、_redline→九项、_skill_sync→十项）
-    与 `.git/hooks/pre-commit` **同序同集**（条数以 `STEPS` 与钩子的 for 循环为准，**别在这儿写数**）：`_collab _diff _lint _anchor _basis
-    _state _consist _layer_audit _const _world _redline _skill_sync _cost _asset _orphan`。
-    ⚠ 有一处**结构不同**：hook 里 `_orphan` 跑的是 `--only <本次新增的 md>`（它要参数），
-      而这里跑无参数的全库模式（列清单、不判红）。**集相同、参数不同**，写清楚免得下一个人对不上。
-    ⚠ 这句话是有保质期的：**每次改 hook 的循环，必须同时改这里**，否则它下一秒就是假的。
-    2026-11-07 已经栽过一次（加 _cost 只改 hook、没改这里，注释当场过期）。
-    原只跑三项，于是「一次看全今天红了几个」这件事
-    做不到——只能自己写 for 循环。**汇总报告对得起「汇总」两个字，就不能选择性省略。**
-    慢几秒，换一份完整的账。
-
-    为什么不全交给 pre-commit：它只在**提交那一刻**跑。开工时想知道「现在能不能干活」，
-    手上没有未提交改动就什么都看不到。本页补的正是「随时能问一遍」。
-
-为什么当初要串起来
-    八个脚本查的是八类不同形状的问题：
-      · _collab  文件级／词表级
-      · _diff    账实比对级
-      · _lint    单行词汇级
-      · _anchor  引用级（失实／行号／断链）
-      · _consist 副本一致性级（同一事实多处副本对不上）
-      · _layer_audit 分层纯度级
-      · _const   常量数值级（画幅／尺寸这类写死的数字）← 措辞有台账，数字以前没有
-      · _world   跨行数值级  ← 这一层以前根本不存在，所以 3260 少个负号一直没人发现
-      · _redline 红线在场级  ← 查的不是项目内容，是「这道墙还在不在」（版权／LICENSE／凭据）
-    分开看容易漏一个，串起来才看得全。
-
-退出码
-    0 ＝ 全绿
-    1 ＝ 有阻断（空项目时走「新项目第一站」那套语气）
-    2 ＝ 只有提示（等作者裁的那种）
-    3 ＝ **还没装完**：`.git` 或门禁钩子缺——十项一项都没跑。
-       这不是「内容还没建」，是「安装步骤还没做」，两件事的处置完全不同。
-
-退出码（与 pre-commit 同语义）
-    任一硬失败 = 1 ｜ 只剩提示 = 2 ｜ 全绿 = 0
-
-用法
-    python _gate.py            # 全跑（项数与 _CHECKS 一致，别在这儿写数字）
-    python _gate.py --brief    # 每段只留一行结论
+完整说明：docs/maintain/代码内长文档/gate/_gate.py.md
 """
 
 import io
@@ -83,8 +33,7 @@ for _std_stream in (sys.stdout, sys.stderr):
     try:
         _std_stream.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 # ---------------------------------------------------------------------------
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -334,13 +283,10 @@ def load_profile():
     return allow, why, d
 
 
-def main():
-    brief = "--brief" in sys.argv
-
+def _check_install(raw):
     # ---------- 装没装完，先判这一步（`G-188`） ----------
     # 放在十项之前：装没装完和内容坏不坏是两个问题，混在一起报就等于两个都没报。
-    _allow, _why, _raw = load_profile()
-    if _raw.get("跳过安装检查"):
+    if raw.get("跳过安装检查"):
         print("⏭ 安装态检查：跳过——本库是公开的方法仓，不是项目工作副本。")
         print("   钩子不装是对的：这里没有「提交前必须拦住」的内容改动。")
         print("")
@@ -365,9 +311,9 @@ def main():
             print("   （装法只有一条：`git config core.hooksPath scripts/hooks`——hook 在库内，不拷副本。）")
             return 3
 
-    results = []
 
-    allow, why = _allow, _why
+def _collect_results(allow, why):
+    results = []
     for title, script, args in STEPS:
         base = script[:-3] if script.endswith(".py") else script
         if allow is not None and base not in allow:
@@ -389,7 +335,10 @@ def main():
         print("⚠ 判据自检（_selftest.py）— 未跑：它约 28 秒，默认不压在门禁上。")
         print("   要现在跑：`python _gate.py --full`；改过检查器的提交，pre-commit 会自动跑它。")
         print("")
+    return results
 
+
+def _report_results(results, brief):
     _nm = project_name()
     print("《%s》· 汇总报告（必经路径是本仓库的 pre-commit 钩子，本页只汇总）" % _nm)
     if _nm == _pname.DEFAULT:
@@ -507,6 +456,20 @@ def main():
     print("✅ 全绿：%d 项都过。" % total)
     print("   ⚠ 只代表「机器能判的都过了」——该不该改、写得好不好，本页判不了。")
     return 0
+
+
+def main():
+    brief = "--brief" in sys.argv
+    allow, why, raw = load_profile()
+
+    install_rc = _check_install(raw)
+    if install_rc:
+        return install_rc
+
+    results = _collect_results(allow, why)
+
+    return _report_results(results, brief)
+
 
 
 if __name__ == "__main__":

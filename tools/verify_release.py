@@ -10,7 +10,6 @@
 退出码：0 = 绿（可以按发布按钮）；1 = 红（不许推）；2 = 黄（有未判项，也不许推）。
 """
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -23,8 +22,7 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
-    pass
-    # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+    pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 GREEN, RED, YELLOW = "绿", "红", "黄"
 DENY = "packaging/public_denylist.txt"
@@ -33,18 +31,21 @@ NOISE = (".git/",)
 TEXT_EXT = (".md", ".txt", ".py", ".json", ".yml", ".yaml", ".cfg", ".ini", ".toml", ".ps1", ".bat", ".sh", ".html", ".css", ".js")
 
 
+from _common import sha256_of
+
+
 def find_git(explicit=None):
     if explicit:
         return explicit
-    w = shutil.which("git")
-    if w:
-        return w
-    for c in (
+    found = shutil.which("git")
+    if found:
+        return found
+    for candidate in (
         "C:/Program Files/Git/cmd/git.exe",
         "C:/Program Files (x86)/Git/cmd/git.exe",
     ):
-        if Path(c).exists():
-            return c
+        if Path(candidate).exists():
+            return candidate
     return None
 
 
@@ -79,14 +80,6 @@ def parse_words(text):
             continue
         words.append(s)
     return words
-
-
-def sha256_of(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def scan_zip(path, words):
@@ -176,7 +169,7 @@ def seal_status(zip_path):
     return True, "封条对得上 " + sha[:8] + " · " + str(size) + " B · " + str(data.get("files")) + " 个文件"
 
 
-def main():
+def _parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default=os.environ.get("SECOND_TAKE_REPO", "D:/dev/second-take"))
     ap.add_argument("--zip", default="")
@@ -190,25 +183,10 @@ def main():
     ap.add_argument("--scan-ref", default="",
                     help="只核某一个 ref（推分支/推旧历史前用）：扫它的树与它的全部历史")
     a = ap.parse_args()
+    return a
 
-    rows = []
-    def row(name, detail, verdict):
-        rows.append((name, detail, verdict))
 
-    git = find_git(a.git)
-    if not git:
-        row("git", "找不到 git 命令", YELLOW)
-        return report(rows, "D:/dev/second-take", "")
-
-    repo = Repo(a.repo, git)
-    exists, _ = repo.ok(["rev-parse", "--git-dir"])
-    if not exists:
-        row("仓库", str(a.repo) + " 不是 git 仓库", RED)
-        return report(rows, a.repo, "")
-
-    _, head = repo.ok(["rev-parse", "--short", "HEAD"])
-    rc, _ = repo.run(["rev-parse", "--verify", "HEAD"])
-
+def _push_gate(a, repo, rows, row, head):
     # --push-gate：钩子用。读 stdin 上的推送清单，逐个 ref 判——不看工作区 HEAD 就算数。
     if a.push_gate:
         words = []
@@ -252,6 +230,8 @@ def main():
                     bad = True
         return report(rows, str(a.repo), head, RED if bad else GREEN)
 
+
+def _scan_ref(a, repo, rows, row, head):
     # --scan-ref：钩子用。只看「这次要推上去的那个 ref」，不看 HEAD。
     if a.scan_ref:
         words = []
@@ -271,6 +251,8 @@ def main():
             row("", path + ":" + str(ln) + " " + text + " @ " + ",".join(commits), RED)
         return report(rows, str(a.repo), sref)
 
+
+def _check_release(a, repo, rows, row, head):
     # 1 工作区
     _, st = repo.ok(["status", "--porcelain"])
     dirty = [l for l in st.splitlines() if l.strip() and not l.startswith("??")]
@@ -377,6 +359,38 @@ def main():
 
     verdict = RED if any(r[2] == RED for r in rows) else (YELLOW if any(r[2] == YELLOW for r in rows) else GREEN)
     return report(rows, str(a.repo), head, verdict)
+
+
+def main():
+    a = _parse_args()
+
+
+    rows = []
+    def row(name, detail, verdict):
+        rows.append((name, detail, verdict))
+
+    git = find_git(a.git)
+    if not git:
+        row("git", "找不到 git 命令", YELLOW)
+        return report(rows, "D:/dev/second-take", "")
+
+    repo = Repo(a.repo, git)
+    exists, _ = repo.ok(["rev-parse", "--git-dir"])
+    if not exists:
+        row("仓库", str(a.repo) + " 不是 git 仓库", RED)
+        return report(rows, a.repo, "")
+
+    _, head = repo.ok(["rev-parse", "--short", "HEAD"])
+    rc, _ = repo.run(["rev-parse", "--verify", "HEAD"])
+
+    if a.push_gate:
+        return _push_gate(a, repo, rows, row, head)
+
+    if a.scan_ref:
+        return _scan_ref(a, repo, rows, row, head)
+
+    return _check_release(a, repo, rows, row, head)
+
 
 
 def dwidth(s):

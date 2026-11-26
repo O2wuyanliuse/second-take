@@ -89,8 +89,7 @@ def main():
     try:
         ver = (repo / "VERSION").read_text(encoding="utf-8-sig").split("·")[0].strip()
     except Exception:
-        pass
-        # 吞：工作树 VERSION 读不到时，按原逻辑回退到 git HEAD:VERSION。
+        pass  # 吞：工作树 VERSION 读不到时，按原逻辑回退到 git HEAD:VERSION。
     if not ver:
         p = subprocess.run([git, "show", "HEAD:VERSION"], cwd=str(repo), stdout=subprocess.PIPE)
         ver = p.stdout.decode("utf-8", "replace").lstrip("\ufeff").split("·")[0].strip()

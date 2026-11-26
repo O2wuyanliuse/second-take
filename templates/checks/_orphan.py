@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
 """_orphan.py · 孤儿件检查（谁都没引用）
 
-定位
-    2026-11-03 23:35 建。起因：`00_原著/_index.md` 立起来之后，**索引本身
-    也没人查**——新件建完补不补那一行，全靠记性。作者要求收工做孤儿检查。
-
-判定
-    一个 .md 文件是孤儿，当且仅当：**除了它自己，没有任何文件提到它的名字。**
-
-    两级：
-      全孤儿   谁都没提，连索引都没有        → 基本等于白建
-      半孤儿   只有索引提了，正文／台账没引用 → 索引里挂着，但流程不走它
-
-排除
-    _原始归档 / 备份 / node_modules / 视图件（html、js 由别的机制管）
-
 用法
     python _orphan.py            # 只报全孤儿与半孤儿
     python _orphan.py --all      # 连引用数一起列，便于抽查
     python _orphan.py --py       # 只看脚本：零引用的 .py（不判红）
+
+完整说明：docs/maintain/代码内长文档/templates/checks/_orphan.py.md
 """
 
 # ---- 输出编码兜底（2026-11-05）--------------------------------------------
@@ -145,9 +133,8 @@ def scan_py():
     return 0
 
 
-def main():
-    if "--py" in sys.argv:
-        return scan_py()
+def _md_options():
+    # 故意重复：模板需脱离 gate 独立带走。
     show_all = "--all" in sys.argv
     # `--only a.md b.md`：只判这几个文件（pre-commit 传「这次新加的 md」）。
     # **为什么需要这个模式**（2026-11-08 00:1x，`G-492`）：
@@ -167,7 +154,12 @@ def main():
             # 不特判的话它会掉回全库模式、报 38 份历史孤儿、退出码 1 ——
             # **一个每天都在红的闸，第三次就被人关掉。**
             print("孤儿检查（--only）：这次没有新增 md，跳过。")
-            return 0
+            return None
+    return show_all, has_only, only
+
+
+def _find_md_rows(only):
+    # 故意重复：模板需脱离 gate 独立带走。
     all_md = walk_md()                       # 全部：作为引用源
     files = [p for p in all_md if os.path.basename(p) not in SKIP_AS_TARGET]
     # ⚠ `only` 只收窄「被判的对象」，**引用源仍是全部 md**——
@@ -178,7 +170,7 @@ def main():
         files = [p for p in files if os.path.normcase(os.path.normpath(p)) in want]
         if not files:
             print("孤儿检查（--only）：给的 %d 个文件里没有 md，或都不在扫描范围内。" % len(only))
-            return 0
+            return None
 
     texts = {}
     for p in all_md:
@@ -203,7 +195,11 @@ def main():
                 if os.path.basename(q) not in INDEX_NAMES:
                     hits_flow.append(q)
         rows.append((p, len(hits_all), len(hits_flow), hits_all))
+    return all_md, files, rows
 
+
+def _report_md_rows(all_md, files, rows, only, show_all, has_only):
+    # 故意重复：模板需脱离 gate 独立带走。
     full = [r for r in rows if r[1] == 0]
     half = [r for r in rows if r[1] > 0 and r[2] == 0]
 
@@ -256,6 +252,23 @@ def main():
     if not has_only:
         return 0
     return 1 if full else 0
+
+
+def main():
+    if "--py" in sys.argv:
+        return scan_py()
+    options = _md_options()
+    if options is None:
+        return 0
+    show_all, has_only, only = options
+
+    found = _find_md_rows(only)
+    if found is None:
+        return 0
+    all_md, files, rows = found
+
+    return _report_md_rows(all_md, files, rows, only, show_all, has_only)
+
 
 
 if __name__ == "__main__":

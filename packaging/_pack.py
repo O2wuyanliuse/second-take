@@ -2,58 +2,7 @@
 # -*- coding: utf-8 -*-
 """_pack.py — 打分发包：把通用层剥出来，做成一个能独立跑的空工作区。
 
-    python packaging/_pack.py --out ../包输出 --zip
-
-## ⚠ 当前状态（2026-11-01 23:40 实测）
-
-**当前状态（2026-11-02 02:20 复测）：能打出来，74 个文件 / 0.6 MB，两道硬闸全过。**
-
-包里多了一份 `使用说明.txt`（给人读的，纯文本、UTF-8 带 BOM、CRLF）——因为**发出去的是 zip**，
-收包的人双击看到的第一个文件决定他会不会读下去。md 在他机器上可能是空白图标，
-txt 不会。zip 里它排在第一条，外面还套了一层同名目录，避免解压时 74 个文件铺满桌面。
-过程不是一次到位的：第一次真跑时 V3 拦下 **189 处专名**（30 个文件），后来才发现
-真正要查的是两类东西——**专名**和**正文原句**，后者 V3 根本看不见。
-
-三个已经踩过的坑，都写在 「待脱敏清单」（已移出仓库，内容存私库）：
-  ① 专名 189 处 → 脱敏层（清单 四类）
-  ② 正文原句 14 处 / 294 字 → `_quote_scan.py` ＋ 上限（不改源文件，只在复制时替）
-  ③ 词表不全：某个组织名、某个角色别名两边都没登记，V3 全绿照样漏
-     → 词表改由 `packaging/_nounlist.py` 三源合一（专名表＋台账＋补充词）
-
-**处置见 「待脱敏清单」（已移出仓库，内容存私库）**。任何一道硬闸不过，`--out` 打出来的包会在
-验包阶段被删掉——**这是设计，不是故障**。
-
-## 为什么是白名单，不是黑名单
-
-**默认什么都不带。要带，必须在本文件里显式列出。**
-
-因为这个项目里，一多半文件含正文、含设定、含过程稿。
-用「排除法」（除了这些之外全带）漏掉一份，**没有任何人会立刻发现**——东西已经发出去了。
-用「白名单」漏掉一份，包一装就报错，**当场就知道**。
-
-> 漏掉的代价：白名单是「返工五分钟」，黑名单是「开源的不可撤销」。
-
-同一件事，`版权与开源红线.md` 已经定过调：**整个项目目录零开源**。
-本脚本的职责不是「尽量多带」，是**「保证带出去的每一份都查过」**。
-
-## 三件事它会做
-
-1. **白名单复制**——只复制 `WHITELIST` 里列的
-2. **模板替换**——凡是含项目数据的文件，换成 `packaging/templates/` 里的空白版
-3. **调 `_verify_package.py` 验包（V0–V8）**——验不过就删掉输出目录并退出码 1
-   V8「文档没有整段连贴两遍」的判据在 `packaging/_dupcheck.py`，
-   同一条命令人也能对整项目跑一遍（见 `发布前检查清单.md` 1.7）。
-   **判据只留一份实现**：打包时和人手工查时跑的是同一个函数。
-
-**第 3 条是硬闸。** 验不过的包不许留在磁盘上，防止「先放这儿，回头再修」然后发出去。
-
-## 用法
-
-    python packaging/_pack.py --dry-run          # 只列清单，不写文件
-    python packaging/_pack.py --out /tmp/pack    # 输出到目录
-    python packaging/_pack.py --out /tmp/pack --zip   # 同时打 zip
-
-输出目录**必须是空的或不存在**。已存在且非空 → 拒绝，不做「覆盖一半」这种半成品。
+完整说明：docs/maintain/代码内长文档/packaging/_pack.py.md
 """
 
 import io
@@ -74,8 +23,7 @@ for _std_stream in (sys.stdout, sys.stderr):
     try:
         _std_stream.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 # ---------------------------------------------------------------------------
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -738,7 +686,7 @@ def collect(dry=False):
     return plan, skipped
 
 
-def main():
+def _preflight():
     # ── 骨架侧 / 项目侧 ───────────────────────────────────────────────
     # `_pack.py` 做的是「把一个项目打成可分发的包」，它需要那个项目的词表。
     # 骨架库不含任何项目内容 → 没有词表可用。**这是正常的，不是坏了。**
@@ -762,6 +710,8 @@ def main():
         print("\n[packaging] 查缺什么：`python packaging/_doctor.py`", file=sys.stderr)
         return 1
 
+
+def _parse_args(args):
     args = sys.argv[1:]
     dry = "--dry-run" in args
     do_zip = "--zip" in args
@@ -770,10 +720,10 @@ def main():
         i = args.index("--out")
         if i + 1 < len(args):
             out = os.path.abspath(args[i + 1])
+    return dry, do_zip, out
 
-    plan, skipped = collect(dry)
-    _build_labels(plan)
 
+def _check_plan(plan, skipped, dry, out):
     print("── 打包计划 ──")
     print("  带出：%d 个文件" % len(plan))
     print("  跳过：%d 个" % len(skipped))
@@ -825,8 +775,8 @@ def main():
         return 1
     print("")
 
-    os.makedirs(out, exist_ok=True)
 
+def _write_files(out, plan):
     for rel_dir in MUST_DIRS:
         os.makedirs(os.path.join(out, rel_dir), exist_ok=True)
 
@@ -868,6 +818,8 @@ def main():
     print("已写入 %d 个文件 → %s" % (len(plan), out))
     print("脱敏：%d 个文件、%d 处替换（源文件未动）" % (touched, total_hits))
 
+
+def _write_manifest(out, plan):
     # ── 文件清单：版本自报 ＋ 每个文件的 sha256（2026-11-02，G-187②）──────
     # 为什么必须有：包内原先**没有任何文件说自己是哪一版**。版本号只活在 zip 名和
     #   几份文档里，用户手上有两个包、名字记混了就答不出「我装的是哪个」。
@@ -906,6 +858,7 @@ def main():
     print("文件清单 → 文件清单.txt（%d 条 sha256，版本 %s）" % (len(man), PKG_NAME))
 
 
+def _compile_package(out):
     # ── 硬闸 0：包里的脚本必须能编译 ──────────────────────────────
     # 2026-11-02（G-147）：外部实测在包里跑 `_selftest.py`，直接 SyntaxError——
     # 脱敏那三条「清空专名表」的规则当时按内容匹配、不分文件，把一条**测试夹具**
@@ -931,6 +884,8 @@ def main():
     print("✅ 包内 %d 个脚本全部编译通过" % len(py_list))
     print("")
 
+
+def _verify_output(out):
     # ── 硬闸 1：正文原句残留 ──
     # V3 查的是专名（名字），查不到「整句原话」。这两件事不一样：
     # 一句原文可以不含任何名字，V3 一律放行。2026-11-02 首测 V3 全绿，
@@ -960,6 +915,8 @@ def main():
         shutil.rmtree(out, ignore_errors=True)
         return 1
 
+
+def _make_zip(out, do_zip):
     if do_zip:
         # ── 硬闸：包名对账（G-179）。打之前先看目录名，别等写完了才发现 ──
         out_name = os.path.basename(out.rstrip("/\\"))
@@ -1000,6 +957,41 @@ def main():
                 return 1
         print("已打 zip → %s（%.1f MB，%d 个文件 ＋ %d 个目录条目，包名 %s）"
               % (zpath, os.path.getsize(zpath) / 1e6, nfiles, ndirs, PKG_NAME))
+
+
+def main():
+    preflight_rc = _preflight()
+    if preflight_rc is not None:
+        return preflight_rc
+
+    dry, do_zip, out = _parse_args(args)
+
+    plan, skipped = collect(dry)
+    _build_labels(plan)
+
+    plan_rc = _check_plan(plan, skipped, dry, out)
+    if plan_rc is not None:
+        return plan_rc
+
+    os.makedirs(out, exist_ok=True)
+
+    _write_files(out, plan)
+
+    manifest_rc = _write_manifest(out, plan)
+    if manifest_rc is not None:
+        return manifest_rc
+
+    compile_rc = _compile_package(out)
+    if compile_rc is not None:
+        return compile_rc
+
+    verify_rc = _verify_output(out)
+    if verify_rc is not None:
+        return verify_rc
+
+    zip_rc = _make_zip(out, do_zip)
+    if zip_rc is not None:
+        return zip_rc
 
     return 0
 

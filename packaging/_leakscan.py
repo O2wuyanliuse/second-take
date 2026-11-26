@@ -7,28 +7,7 @@
 
 退出码：`0` 干净 ／ `1` 有命中 ／ `2` **没给词表（没查成，不算通过）**
 
-## 它跟 `_sync_check.py` 的泄漏闸有什么不同
-
-那个闸查的是「**私库要送出去的那份**里有没有专名」——有源码，有词表，有靶子。
-这个查的是「**通用库自己**里有没有残留」：注释里的举例、docstring 里的事故复盘、
-正则里写死的本机目录名……**这些不是从私库搬过来的，是自己长出来的**，所以那个闸看不见。
-
-## 为什么词表必须从外面给
-
-通用库不含项目内容 → 它**没有**词表，这是设计。所以反向扫描只能由项目侧发起：
-词表留在私库，脚本留在通用库，两边都不越界。脚本自己带一份词表，就等于把项目搬进来了。
-
-## 为什么默认连历史一起扫
-
-文件改掉 ≠ 泄漏消失。被改的那行还躺在上一个提交里，仓库一转公开，`git log -p` 就能看。
-**当前文件是绿的、历史是红的，整体就是红的。**
-
-## 已知边界
-
-- 只扫**被跟踪**的文件（工作区）与**全部 blob**（历史）。未跟踪的临时文件不扫——它们不进仓库。
-- 二进制文件按字节扫，只在命中时提示「二进制」，不打印上下文。
-- 大小写不敏感：同一个词的大小写变体算同一个词。
-- 不判断语义。命中一处报一处，是不是真泄漏由人定。**宁可多报。**
+完整说明：docs/maintain/代码内长文档/packaging/_leakscan.py.md
 """
 
 import io
@@ -40,8 +19,7 @@ for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -293,12 +271,7 @@ def scan_history(words):
     return hits
 
 
-def main():
-    args = sys.argv[1:]
-    if "-h" in args or "--help" in args:
-        print(__doc__)
-        return 0
-
+def _parse_args(args):
     word_paths, do_history, strict = [], True, False
     i = 0
     while i < len(args):
@@ -337,47 +310,42 @@ def main():
             "       指定法：`--words <私库的词表.txt>` 或设 `LEAK_WORDS`。\n"
             "       通用库自己不带词表（这是设计，不是缺文件）："
             "项目侧发起，才知道该查什么。")
+    return word_paths, do_history, strict
 
-    words = load_words(word_paths)
-    if not words:
-        die("词表读出来是空的：%s → 空词表会让任何仓库都显示「干净」。"
-            % "、".join(word_paths))
 
-    print("[leak] 通用库：%s" % ROOT)
-    print("[leak] 词表　：%d 个词，来自 %s"
-          % (len(words), "、".join(sorted({s for _, s in words}))))
+def _split_hits(hs, allow, known_hist):
+    """(豁免的, 已登记的旧残留, 待处理的)。先分再报数——否则「工作区 11 处」会把人吓一跳，
+    而那 11 处全是同一句话里的工具名。**数字要能读，不然红就白红了。**"""
+    ax, kx, rest = [], [], []
+    for h in hs:
+        if h[0].lower() in allow:
+            ax.append(h)
+        elif (h[0].lower(), h[1]) in known_hist:
+            kx.append(h)
+        else:
+            rest.append(h)
+    return ax, kx, rest
 
-    allow, noreason = load_allow()
-    known_hist, known_noreason = load_known_history()
 
-    def split(hs):
-        """(豁免的, 已登记的旧残留, 待处理的)。先分再报数——否则「工作区 11 处」会把人吓一跳，
-        而那 11 处全是同一句话里的工具名。**数字要能读，不然红就白红了。**"""
-        ax, kx, rest = [], [], []
-        for h in hs:
-            if h[0].lower() in allow:
-                ax.append(h)
-            elif (h[0].lower(), h[1]) in known_hist:
-                kx.append(h)
-            else:
-                rest.append(h)
-        return ax, kx, rest
-
+def _scan_leaks(words, do_history, allow, known_hist):
     hits = scan_worktree(words)
-    pw, kw, rw = split(hits)
+    pw, kw, rw = _split_hits(hits, allow, known_hist)
     print("[leak] 工作区：%d 处（豁免 %d ／ 已登记 %d ／ 待处理 %d）"
           % (len(hits), len(pw), len(kw), len(rw)))
 
     hist = []
     if do_history:
         hist = scan_history(words)
-        ph, kh, rh = split(hist)
+        ph, kh, rh = _split_hits(hist, allow, known_hist)
         print("[leak] 历史　：%d 处（豁免 %d ／ 已登记 %d ／ 待处理 %d）—— 全部提交的全部 blob"
               % (len(hist), len(ph), len(kh), len(rh)))
     else:
         ph, kh, rh = [], [], []
         print("[leak] 历史　：已跳过（`--no-history`）—— **这一半没查**")
+    return rw, rh, pw, ph, kw, kh
 
+
+def _report_leaks(noreason, known_noreason, strict, do_history, rw, rh, pw, ph, kw, kh):
     if _skipped:
         # 去重后再数：同一份词表在工作区和历史里各命中一次，按次数报会把 2 说成 4。
         uniq = sorted(set(_skipped))
@@ -431,6 +399,32 @@ def main():
     print("")
     print("[leak] 结论：**红。转公开之前必须清零。**")
     return 1
+
+
+def main():
+    args = sys.argv[1:]
+    if "-h" in args or "--help" in args:
+        print(__doc__)
+        return 0
+
+    word_paths, do_history, strict = _parse_args(args)
+
+    words = load_words(word_paths)
+    if not words:
+        die("词表读出来是空的：%s → 空词表会让任何仓库都显示「干净」。"
+            % "、".join(word_paths))
+
+    print("[leak] 通用库：%s" % ROOT)
+    print("[leak] 词表　：%d 个词，来自 %s"
+          % (len(words), "、".join(sorted({s for _, s in words}))))
+
+    allow, noreason = load_allow()
+    known_hist, known_noreason = load_known_history()
+
+    rw, rh, pw, ph, kw, kh = _scan_leaks(words, do_history, allow, known_hist)
+
+    return _report_leaks(noreason, known_noreason, strict, do_history, rw, rh, pw, ph, kw, kh)
+
 
 
 if __name__ == "__main__":

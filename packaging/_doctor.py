@@ -4,23 +4,9 @@
 用法：
     python packaging/_doctor.py
 
-回答三个问题：
-    ① 我在哪一侧？——**骨架侧**（本仓库，不含任何项目内容）／**项目侧**（有 `00_原著/`）
-    ② 三组词表齐不齐？
-    ③ 不齐的话，是「正常」还是「该修」？
-
 退出码：`0` 齐 ／ `2` 骨架侧（缺是正常的）／ `1` 项目侧缺（该修）
 
-## 为什么要有这个
-
-`_nounlist.py` 缺词表时会**拒绝开工**（`NounlistMissing`）——那是有意的：
-空词表会让每一份素材都显示「干净」，2026-11-10 那次公开仓泄露正是这个形态。
-
-但「拒绝」和「报错」是两件事。新人 clone 下来一跑就是一屏 traceback，
-会以为仓库坏了。**该说的是「这里不该跑」和「去你的项目里跑」，不是一段堆栈。**
-
-同类的做法里，这一层叫 doctor：`flutter doctor`、`brew doctor`、`npx react-native doctor`。
-它不替你修，只**把「缺什么、缺得对不对、下一步去哪」一次说清**。
+完整说明：docs/maintain/代码内长文档/packaging/_doctor.py.md
 """
 
 import os
@@ -30,8 +16,7 @@ for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)

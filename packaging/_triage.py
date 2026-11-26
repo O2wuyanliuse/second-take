@@ -4,20 +4,9 @@
 用法：
     python packaging/_triage.py <文件或目录> [--nouns-file 词表.txt]
 
-输出：建议等级（A / B / C）＋ 依据（命中哪些专名、是否疑似叙事、有无硬问题）。
 退出码：`0` 已给建议 ／ `1` 有硬问题（密钥、本机路径）—— 硬问题不看等级，先修。
 
-## 三条纪律
-
-① **它不判定，只提示。** 等级由人写进 E0 登记第 9 项。脚本给的是候选。
-② **词表不全就报错，不许静默给 A。** 一份空词表会让任何素材都显示“干净”——
-   这正是 2026-11-10 那次泄露的形态：打包全绿，词表其实是空的。
-③ **结构类信号不依赖词表**（密钥、本机路径、疑似叙事），任何时候都能查。
-
-## 为什么在 E0 而不是打包时
-
-脱敏需要的信息在投喂那一刻最全：作者知道“这个词是组织名还是普通词”。
-到了打包阶段只剩 grep，而 grep 只知道出现过，不知道是什么。
+完整说明：docs/maintain/代码内长文档/packaging/_triage.py.md
 """
 
 import io
@@ -29,8 +18,7 @@ for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -113,27 +101,7 @@ def iter_files(target):
                 yield os.path.join(dp, fn)
 
 
-def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if not args:
-        print(__doc__)
-        return 0
-    target = args[0]
-    nouns_file = None
-    if "--nouns-file" in sys.argv:
-        i = sys.argv.index("--nouns-file")
-        if i + 1 < len(sys.argv):
-            nouns_file = sys.argv[i + 1]
-
-    words, src, missing = load_nouns(nouns_file)
-    print("[triage] 词表：%s ｜ %d 个词" % (src, len(words)))
-    if missing:
-        # 2026-11-20（冷启动实测·问题 3）：否决必须在数字前面。
-        # 原来 ⛔ 夹在中间、后面紧跟「专名命中 0 处」——人眼只抓住那个 0，看不见「不许判 A」。
-        print("[triage] ⛔ **词表不全 → 本次结论：未判定。** 下面「专名」那一栏是「未查」，不是 0。")
-        print("[triage]    原因：%s" % missing)
-        print("[triage]    结构类信号（密钥／本机路径／疑似叙事）照常给。")
-
+def _scan_target(target, words):
     noun_hits, hard, soft, narr, nfiles, ids = {}, [], [], 0, 0, 0
     for fp in iter_files(target):
         nfiles += 1
@@ -157,7 +125,10 @@ def main():
                 ids += 1
             if NARRATIVE_PAT.search(ln):
                 narr += 1
+    return noun_hits, hard, soft, narr, nfiles, ids
 
+
+def _report_triage(noun_hits, hard, soft, narr, nfiles, ids, missing):
     total = sum(len(v) for v in noun_hits.values())
     # 词表不全时不能报「0 处」——0 是「查过且没有」，未查是「没查」。两个意思混在一格里，
     # 就是「查不下去 ＝ 通过」在输出层的同型错误（2026-11-20 冷启动实测·问题 3）。
@@ -203,6 +174,33 @@ def main():
         print("[triage] ⛔ 结论：**%s**——退出码 %d，**这不是通过**。"
               % ("有硬问题，先修硬问题" if hard else "未判定（词表不全）", code))
     return code
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        print(__doc__)
+        return 0
+    target = args[0]
+    nouns_file = None
+    if "--nouns-file" in sys.argv:
+        i = sys.argv.index("--nouns-file")
+        if i + 1 < len(sys.argv):
+            nouns_file = sys.argv[i + 1]
+
+    words, src, missing = load_nouns(nouns_file)
+    print("[triage] 词表：%s ｜ %d 个词" % (src, len(words)))
+    if missing:
+        # 2026-11-20（冷启动实测·问题 3）：否决必须在数字前面。
+        # 原来 ⛔ 夹在中间、后面紧跟「专名命中 0 处」——人眼只抓住那个 0，看不见「不许判 A」。
+        print("[triage] ⛔ **词表不全 → 本次结论：未判定。** 下面「专名」那一栏是「未查」，不是 0。")
+        print("[triage]    原因：%s" % missing)
+        print("[triage]    结构类信号（密钥／本机路径／疑似叙事）照常给。")
+
+    noun_hits, hard, soft, narr, nfiles, ids = _scan_target(target, words)
+
+    return _report_triage(noun_hits, hard, soft, narr, nfiles, ids, missing)
+
 
 
 if __name__ == "__main__":

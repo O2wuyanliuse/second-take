@@ -1,35 +1,12 @@
 # -*- coding: utf-8 -*-
 """_links.py — 这个仓库自己引用的路径，到底存不存在。
 
-## 为什么要有它
-
-`_anchor.py` 留在项目侧，查的是「项目文档引用的路径在不在」。**这个仓库没有它**，
-于是通用层文档里写着 `00_原著/_mkview.py` 这种路径，一个字都不会报——
-可它在骨架库里根本不存在。`11_分发说明` §四 立的「名字不带位置」，
-在通用层内部反而是无闸的。
-
-## 它查什么
-
-md 里用反引号包住、**同时满足下面四条**的才算候选：
-
-1. 含 `/`（不带路径分隔符的一律当「名字」，不管）
-2. 以 `.md` / `.py` / `.json` / `.txt` / `.html` 结尾
-3. 不含空格（含空格的多半是命令，`python gate/_gate.py` 这种）
-4. 不含 `http` / `<` / `>` / `*` / `…` / `·`（URL、占位、通配、省略号）
-
-候选里，`os.path.exists` 为假的报出来。
-
-## 它故意不做什么
-
-- **不判断引用内容对不对**，只判断文件在不在。
-- **不认识「项目实例」**。有些文档开头写着「本文出现的 `00_原著/xxx` 是项目实例，带走后不存在是正常的」——
-  这种声明是合法的，脚本不猜。**带这类声明的文件，命中降级成提示**，由人看。
-- **不查图片、不查链接语法**（`[文字](路径)`），那要解析 md，代价不成比例。
-
 用法：
     python gate/_links.py            # 只看结论
     python gate/_links.py --each     # 逐条列
 退出码：`0` 干净 ／ `1` 有断链 ／ `2` 文件都找不到（没查成，不算通过）
+
+完整说明：docs/maintain/代码内长文档/templates/checks/_links.py.md
 """
 
 import io
@@ -41,8 +18,7 @@ for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

@@ -2,26 +2,12 @@
 # -*- coding: utf-8 -*-
 """规则引擎：把「判据的形状」和「项目的绑定」物理分开。
 
-一条规则 = 两份文件
-    rules/<名>.rule.json    形状：参数名、类型、必填、说明        ← 可以公开
-    rules/<名>.bind.json    绑定：本项目这些参数填什么            ← 不进公开库
-    (rules/<名>.bind.example.json  空靶：全留空，只演示怎么填)
-
-三种结局，缺一不可
-    绿  已绑定，且无违规           → 退出码 0
-    红  已绑定，且有违规           → 退出码 1
-    未绑定  参数不齐                → 退出码 2，逐条列出缺什么、去哪填
-
-**为什么「未绑定」必须是独立状态，而不是绿**
-    空词表不会报错，它只会让每一份素材都显示「干净」——
-    2026-11-10 那次公开仓泄露就是这么发生的：三组词表全空，
-    脱敏什么都没删，验包报「全绿」，带着专名发了出去。
-    所以这里把「没绑定」和「通过了」在退出码上就分开，谁都混不了。
-
 用法
     python rules/_rule.py --list
     python rules/_rule.py 同一实体两种定性
     python rules/_rule.py 同一实体两种定性 --bind rules/别的.bind.json
+
+完整说明：docs/maintain/代码内长文档/rules/_rule.py.md
 """
 
 from __future__ import print_function

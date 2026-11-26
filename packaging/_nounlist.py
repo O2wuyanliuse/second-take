@@ -1,23 +1,7 @@
 # -*- coding: utf-8 -*-
 """_nounlist.py — 脱敏与查名共用的词表。三个来源，缺一个都会漏。
 
-    A  `00_原著/_collab.py` 的 `PROJECT_NOUNS`   —— 人物与地点（14 个）
-    B  `00_原著/专名对账_v1.md` 表格第一列        —— 设定词（去同形异义，16 个）
-    C  `packaging/脱敏补充词.txt`               —— 上两处都没登记的：组织名、别名、全名
-
-## 为什么必须有 C（2026-11-02 实测，不是推演）
-
-一类 **组织名** 和一类 **人物别名** 在 A、B 里**都没有**，于是 V3 全绿，包照样带着它们出去了：
-    `[标准]文字转画面转化规则_v1.md` 的教学表格里有一句原文引文，含组织真名
-    `skills/ai-video-pipeline/SKILL.md` 的两行示例里，有人物真名
-
-**这不是台账写错了。** 台账登记的是「正文里实际用什么名字」，**组织名和别名本来就不在它的范围**。
-登记表没覆盖的地方，只能人工列出来，然后由脚本保证它不会再漏。
-
-## 一条纪律
-
-**词表本身不许再复制一份。** `_pack.py` 与 `_verify_package.py` 都从这里取——
-两边各抄一份，就又是一对会漂的副本（今天已经在 `07_视觉提示词规则` 上吃过一次）。
+完整说明：docs/maintain/代码内长文档/packaging/_nounlist.py.md
 """
 
 import io
@@ -36,8 +20,7 @@ for _std_stream in (sys.stdout, sys.stderr):
     try:
         _std_stream.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
-        pass
-        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
+        pass  # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 # ---------------------------------------------------------------------------
 
 HERE = os.path.dirname(os.path.abspath(__file__))
