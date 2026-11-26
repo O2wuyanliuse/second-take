@@ -49,6 +49,7 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:  # noqa: BLE001
         pass
+        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 # 三样要素的识别词。**只认这些词，不认列序**——各项目表头写法不同，绑列序等于绑项目。
 RE_WHERE = re.compile(r"原文.{0,6}(在哪|位置|来源|出处)|文件路径|投喂来源")

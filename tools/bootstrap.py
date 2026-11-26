@@ -205,8 +205,8 @@ def run_init(root):
         try:
             _status.write_report(REPO, lines)
             say("  （以上同时写进 workspace/开工报告.md，之后随时可再看）")
-        except Exception:
-            pass
+        except Exception as e:
+            say("  （开工报告没写成：%s）" % e)
     except Exception as e:
         say("  (状态页没跑起来: %s)" % e)
 

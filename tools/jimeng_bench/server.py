@@ -387,6 +387,7 @@ def do_generate(req):
             queue_name = m.group(1)
     except Exception:
         pass
+        # 吞：queue_name 只是可选调试字段，解析失败仍返回空串。
 
     return {
         "ok": True, "batch": batch, "submit_id": submit_id,

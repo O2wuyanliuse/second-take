@@ -32,6 +32,7 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -111,8 +112,8 @@ def leak_hits(path):
             m = SECRET.search(ln)
             if m:
                 out.append((i, "密钥", m.group(0)[:12] + "…"))
-    except Exception:
-        pass
+    except Exception as e:
+        raise RuntimeError("同步检查读取文件失败") from e
     return out
 
 

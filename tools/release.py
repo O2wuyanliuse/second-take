@@ -42,6 +42,7 @@ try:
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
+    # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 # git 不在 PATH 时，允许用环境变量 GIT 指定绝对路径（不硬编码任何人的机器路径）。
 GIT = os.environ.get("GIT") or shutil.which("git") or "git"

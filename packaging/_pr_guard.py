@@ -41,6 +41,7 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 SUSPICIOUS = [
     ("网络请求", re.compile(r"\b(urllib|requests\.|http\.client|socket\.|urlopen|httpx)\b")),

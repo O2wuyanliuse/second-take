@@ -41,6 +41,7 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+        # 吞：输出流不支持 reconfigure 时保留原编码，不让输出配置阻断检查。
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -243,8 +244,8 @@ def blob_texts(shas):
             if len(parts) >= 3 and parts[1] != b"missing":
                 try:
                     p.stdout.read(int(parts[2]))
-                except Exception:
-                    pass
+                except Exception as e:
+                    raise RuntimeError("读取 git blob 内容失败") from e
                 p.stdout.read(1)
             continue
         size = int(parts[2])
