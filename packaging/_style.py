@@ -76,9 +76,16 @@ def _broad_exception(node):
 def _silent_exit(node):
     if isinstance(node, (ast.Pass, ast.Continue)):
         return True
-    return isinstance(node, ast.Return) and (
-        node.value is None or isinstance(node.value, ast.Constant)
-    )
+    if not isinstance(node, ast.Return):
+        return False
+    value = node.value
+    if value is None or isinstance(value, ast.Constant):
+        return True
+    if isinstance(value, (ast.List, ast.Dict, ast.Tuple, ast.Set)):
+        return not getattr(value, "elts", getattr(value, "keys", []))
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
+        return value.func.id == "set" and not value.args and not value.keywords
+    return isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.USub) and isinstance(value.operand, ast.Constant)
 
 
 def _bare_except(fn, lines):

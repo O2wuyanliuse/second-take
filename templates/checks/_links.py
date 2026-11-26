@@ -35,7 +35,7 @@ def _load_cfg():
         import json
         return json.load(io.open(p, encoding="utf-8"))
     except Exception:
-        return {}
+        return {}  # 吞：配置读坏按无配置处理，沿用默认 root。
 
 
 CFG = _load_cfg()

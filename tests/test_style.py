@@ -134,6 +134,13 @@ def test_silent_return_false_requires_inline_reason():
     assert not swallow_issue(inline)
 
 
+def test_empty_containers_and_negative_one_are_silent_exits():
+    for expression in ("[]", "{}", "()", "set()", "-1"):
+        assert swallow_issue(broad_handler("Exception", "return " + expression))
+        inline = "return " + expression + "  # 吞：无结果按空值处理"
+        assert not swallow_issue(broad_handler("Exception", inline))
+
+
 def test_specific_exceptions_and_multi_statement_handlers_are_out_of_scope():
     assert not swallow_issue(broad_handler("(ImportError, ValueError)", "return False"))
     assert not swallow_issue(broad_handler("OSError", "pass"))
