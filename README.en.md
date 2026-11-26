@@ -28,11 +28,13 @@ Download `second-take-x.y.z-win.zip` from [Releases](https://github.com/O2wuyanl
 
 ### 2. Install
 
+Installing only prepares the environment. It does not start work — that is step 3.
+
 **A. Let your AI install it (recommended — the path shown in the demo video)**
 
 Drag the zip straight into your AI workbench's chat (DSH, Claude Code, Cursor — any of them) together with this line:
 
-> Unpack this archive into an empty directory, run `python tools/bootstrap.py` there, and paste back the three lines it prints.
+> Unpack this archive into an empty directory, run `python tools/bootstrap.py` there, and paste back the three lines it prints. It only means the install worked, not that work has started.
 
 **If you don't want to open a terminal, that is the whole install.**
 
@@ -50,6 +52,8 @@ python tools/bootstrap.py --check   # inspect only, writes nothing
 `pytest` and `ruff` are optional: you can start without them. The test suite and CI dependencies are maintainer-only and not shipped with the package — see the repository page if you want to run them.
 
 ### 3. Read what it said
+
+At this point it is still idle: paste the kickoff prompt to wake it.
 
 What you get is not a wall of green — it is these three lines:
 
@@ -96,6 +100,8 @@ If you disagree with these, the rest will feel wrong:
 - Want to know **where you are and what will trip you**: `python tools/status.py` — plain language only: coverage, risks, next steps; it always exits 0 (a mirror, not a gate — it never blocks you).
 - Want to know **the state of this repository and workspace**: `python tools/doctor.py` (six lines: python / git / version / workspace / config / last evidence).
 - Want to know **whether you shipped something you shouldn't have**: de-identification and packing are maintainer-only and not shipped with the package — get them from the repository page. This library never ships a wordlist: a wordlist spells out the words it bans, so it belongs to your project.
+
+Never place this package in a global AI config directory such as ~/.dsh/AGENTS.md — it would be read in every project, which is pollution. The only supported install is a project-local AGENTS.md.
 
 ## Boundaries
 
