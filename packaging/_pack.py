@@ -711,15 +711,14 @@ def _preflight():
         return 1
 
 
-def _parse_args(args):
-    args = sys.argv[1:]
-    dry = "--dry-run" in args
-    do_zip = "--zip" in args
+def _parse_args(argv):
+    dry = "--dry-run" in argv
+    do_zip = "--zip" in argv
     out = None
-    if "--out" in args:
-        i = args.index("--out")
-        if i + 1 < len(args):
-            out = os.path.abspath(args[i + 1])
+    if "--out" in argv:
+        i = argv.index("--out")
+        if i + 1 < len(argv):
+            out = os.path.abspath(argv[i + 1])
     return dry, do_zip, out
 
 
@@ -964,7 +963,7 @@ def main():
     if preflight_rc is not None:
         return preflight_rc
 
-    dry, do_zip, out = _parse_args(args)
+    dry, do_zip, out = _parse_args(sys.argv[1:])
 
     plan, skipped = collect(dry)
     _build_labels(plan)
