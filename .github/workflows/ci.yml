@@ -40,6 +40,8 @@ jobs:
           grep -q "github.com/$slug/" latest.json || { echo "::error::latest.json 指向的不是 $slug"; exit 1; }
       - name: ① ruff（只开真错：F + E9）
         run: python -m ruff check .
+      - name: ①b 代码硬约束（_style）
+        run: python packaging/_style.py
       # CI 就是一台干净机器——正好让它自证「clone 下来能不能自己长出来」。
       # 先幂等 init（缺目录就建），再 check（退出 0 才算合格）。
       - name: ② 启动自检（干净机器：先建再验）
