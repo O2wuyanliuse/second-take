@@ -355,7 +355,7 @@ def _chk_history(a, repo, words):
         n, items = scan_history(repo, words)
         rows.append(("9 历史命中", str(n) + " 处（全历史，" + str(len((repo.ok(["rev-list", "HEAD"])[1]).split())) + " 个提交）", GREEN if n == 0 else RED))
         for path, ln, text, commits in items:
-            rows.append(("", path + ":" + str(ln) + " " + text + " " + chr(64) + " " + ",".join(commits), RED))
+            rows.append(("", path + ":" + str(ln) + " " + text + " @ " + ",".join(commits), RED))
     elif words:
         rows.append(("9 历史命中", "已跳过（--no-history）", YELLOW))
     return rows
