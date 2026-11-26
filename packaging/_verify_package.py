@@ -221,88 +221,72 @@ def check_v3(root, fails, warns, all_files, nouns, noun_err):
 
 
 
-def check_v4(root, fails, warns):
-    # ── V4 脚本能跑 ──
-    #    **包里所有脚本全跑，不只是两个。**
-    #    脱敏会往脚本里做文本替换（清空专名表、替换词），最容易的坏法是「改完还能 import，
-    #    但一执行就抛异常」。只验两个脚本等于只验 10%，剩下的坏了没人知道。
-    #    判据只有一条：**不许出现 Traceback**。退出码 0/1/2 都算正常——
-    #    1 可能是「查出了问题」，2 可能是「参数不对」，都不是崩。
-    #    ⚠ 标题里的数字必须现算。原先写死「22 个」，2026-11-02 从白名单剔掉两个脚本后
-    #      实际只有 20 个，标题还在说 22——**一个当场就过期的数字，比没有数字更糟**。
-    #    ⚠ 2026-11-02 02:05 修：**跑脚本要跑在副本里，不能跑在被验的包上。**
-    #      `_mkview`／`_board` 会往 `00_原著/` 写 `[视图]*.html`——于是验完的包比验前多两个文件，
-    #      而 zip 是在验完之后打的，**这两个从没被验证过的文件就这样进了发行包**。
-    #      发现方式是数不上：`_pack` 说写入 74 个，V2 说 74 个，第二次验却成了 76。
-    #      原则一句话：**验证不许改被验的东西**。跑坏了也不该在真件上留痕。
-    py_dir = os.path.join(root, "00_原著")
-    scripts = sorted(f for f in os.listdir(py_dir)
-                         if f.startswith("_") and f.endswith(".py")) if os.path.isdir(py_dir) else []
-    sandbox = None
-    run_root = root
-    if scripts:
-            sandbox = tempfile.mkdtemp(prefix="verifypkg_")
-            run_root = os.path.join(sandbox, "pkg")
-            shutil.copytree(root, run_root)
-    # ── V4a 先编译，再谈跑 ──
-    # 2026-11-02（G-147）：外部实测在包里跑 `_selftest.py`，直接 SyntaxError，
-    # 而 V4 只找输出里的「Traceback」——**语法错不打印 Traceback**，
-    # 于是「21 个全跑通」和「根本没编译过」在 V4 眼里长得一样，它报了绿。
-    # 编译是确定的判据：没有解释空间。先过这一关，再谈跑不跑。
+def _v4a_compile(scripts, root, fails):
     print("\nV4a 脚本能编译（%d 个）" % len(scripts))
     uncompiled = []
     for script in scripts:
-            src_path = os.path.join(root, "00_原著", script)
-            try:
-                with open(src_path, encoding="utf-8") as f:
-                    compile(f.read(), script, "exec")
-            except SyntaxError as e:
-                uncompiled.append((script, "%s（第 %s 行）" % (e.msg, e.lineno)))
-            except OSError as e:
-                uncompiled.append((script, str(e)))
+        src_path = os.path.join(root, "00_原著", script)
+        try:
+            with open(src_path, encoding="utf-8") as f:
+                compile(f.read(), script, "exec")
+        except SyntaxError as e:
+            uncompiled.append((script, "%s（第 %s 行）" % (e.msg, e.lineno)))
+        except OSError as e:
+            uncompiled.append((script, str(e)))
     for script, why in uncompiled:
-            print("  ✗ %s：%s" % (script, why))
-            fails.append("V4a %s 编译不过（%s）" % (script, why))
+        print("  ✗ %s：%s" % (script, why))
+        fails.append("V4a %s 编译不过（%s）" % (script, why))
     if not uncompiled:
-            print("  ✅ %d 个全部编译通过" % len(scripts))
+        print("  ✅ %d 个全部编译通过" % len(scripts))
 
+
+def _v4_run(scripts, run_root, fails):
     print("\nV4 脚本能跑（包里 %d 个全跑；判的只是「不崩」，不是「判得对」）" % len(scripts))
     print("  [scope] 在临时副本里跑，不在真件上跑——`_mkview`／`_board` 会写 [视图]*.html，"
-              "跑在真件上等于往待发的包里塞两个没验过的文件")
+          "跑在真件上等于往待发的包里塞两个没验过的文件")
     crashed, ok = [], 0
     for script in scripts:
-            p = os.path.join(run_root, "00_原著", script)
-            try:
-                r = subprocess.run([sys.executable, p], cwd=run_root,
-                                   capture_output=True, text=True, timeout=180,
-                                   # 包内脚本已 reconfigure 成 utf-8 输出；这里不指定就会
-                                   # 按 locale（中文机 cp936）解码，轻则乱码、重则 UnicodedecodeError
-                                   # 被当成「脚本崩了」——假红比假绿更贵，它逼人去改没坏的东西。
-                                   encoding="utf-8", errors="replace")
-                out = (r.stdout or "") + (r.stderr or "")
-                if "Traceback" in out:
-                    last = [ln for ln in out.strip().splitlines() if ln.strip()][-1][:90]
-                    print("  ✗ %-22s 抛异常：%s" % (script, last))
-                    crashed.append(script)
-                else:
-                    ok += 1
-            except subprocess.TimeoutExpired:
-                print("  ✗ %-22s 跑超时" % script)
+        p = os.path.join(run_root, "00_原著", script)
+        try:
+            r = subprocess.run([sys.executable, p], cwd=run_root,
+                               capture_output=True, text=True, timeout=180,
+                               encoding="utf-8", errors="replace")
+            out = (r.stdout or "") + (r.stderr or "")
+            if "Traceback" in out:
+                last = [ln for ln in out.strip().splitlines() if ln.strip()][-1][:90]
+                print("  ✗ %-22s 抛异常：%s" % (script, last))
                 crashed.append(script)
-            except Exception as e:                      # noqa: BLE001
-                print("  ✗ %-22s 起不来：%s" % (script, e))
-                crashed.append(script)
-    if sandbox:
-            shutil.rmtree(sandbox, ignore_errors=True)
-
+            else:
+                ok += 1
+        except subprocess.TimeoutExpired:
+            print("  ✗ %-22s 跑超时" % script)
+            crashed.append(script)
+        except Exception as e:                      # noqa: BLE001
+            print("  ✗ %-22s 起不来：%s" % (script, e))
+            crashed.append(script)
     if crashed:
-            fails.append("V4 %d 个脚本崩溃：%s" % (len(crashed), "／".join(crashed[:5])))
+        fails.append("V4 %d 个脚本崩溃：%s" % (len(crashed), "／".join(crashed[:5])))
     else:
-            print("  ✅ %d 个脚本全部跑通（没有 Traceback 就是没崩；报错是预期内的——"
-                  "包是空项目，它们当然找不到项目文件）" % ok)
+        print("  ✅ %d 个脚本全部跑通（没有 Traceback 就是没崩；报错是预期内的——"
+              "包是空项目，它们当然找不到项目文件）" % ok)
 
+
+def check_v4(root, fails, warns):
+    # G-147 等完整来历见 docs/maintain/验包十三项.md（维护仓，不随包）。
+    py_dir = os.path.join(root, "00_原著")
+    scripts = sorted(f for f in os.listdir(py_dir)
+                     if f.startswith("_") and f.endswith(".py")) if os.path.isdir(py_dir) else []
+    sandbox = None
+    run_root = root
+    if scripts:
+        sandbox = tempfile.mkdtemp(prefix="verifypkg_")
+        run_root = os.path.join(sandbox, "pkg")
+        shutil.copytree(root, run_root)
+    _v4a_compile(scripts, root, fails)
+    _v4_run(scripts, run_root, fails)
+    if sandbox:
+        shutil.rmtree(sandbox, ignore_errors=True)
     return fails, warns
-
 
 
 def check_v5(root, fails, warns, all_files):
@@ -521,98 +505,83 @@ def check_v10(root, fails, warns):
 
 
 
-def check_v11(root, fails, warns):
-    # ── V11 包里没有「这台机器的坐标」（2026-11-04，`G-300`）──
-    #
-    # 为什么单列一条：V3 查的是**项目专名**，查不到**路径**。这类泄漏有个特点——
-    # 「引用的东西明明在包里，只是坐标写成了绝对路径」，收件人点开是空的，
-    # **会以为自己装错了**。所以判据不是「有没有提到某个词」，是
-    # 「这个坐标换台机器还成不成立」。
-    #
-    # ⚠ 两条克制，都是被实测逼出来的：
-    #   ① **不把裸词判死**。说明书里写着「出现 AppData／Temp 就说明你装进了临时目录」——
-    #      那句是**判据本身**，不是坐标。判红它，下一个人就会去删警示语。
-    #      所以：路径形态 → 红；裸词 → 只提一句，不拦。
-    #   ② **盘符后面必须跟一个真字符**。第一版写 `[A-Za-z]:[\\/]`，当场把脚本里的
-    #      正则字面量 `r"[\s:\-]*"` 判成 `s:\-` ＝ 盘符路径，四个检查器全中。
-    #      判据松一格，工具就开始咬自己。
-    #
-    # 确实需要举一个反面路径例子的行，两种放行方式：
-    #   行内写 `[坐标-ok]`（同 `[lint-ok]` 的老做法）；或加进下面那张表，**逐条列名**。
-    print("\nV11 包里没有「这台机器的坐标」")
-    EXT_V11 = (".md", ".txt", ".py", ".html", ".json", ".yml", ".yaml", ".sh", ".js", ".css")
-    # 逐条列名，不许通配——通配等于把一整类放开，而这一类正是最该被拦的。
-    #
-    # 用 `needle` 认的是**语义锚点**，不是路径值（2026-11-04 改，`G-302`）。
-    # 原写法拿 `D:\我的创作` 当 needle：说明书里把示范盘符改成 `E:\作品`， [坐标-ok]
-    # 豁免当场失配 → 干净包变红。**判据钉在会变的东西上，它就一定会误报。**
-    # 现在钉的是「这行为什么被放行」那句话本身；那句话改了，
-    # 说明语义变了，本来就该重新看这张表。
-    V11_EXEMPT = [
-            ("从这里开始.txt", "没问题，往下走", "正文里的**示范路径**：告诉用户「正常的路径长这样」"),
-            ("从这里开始.txt", "请重新解压到", "**反面示例**：告诉用户「你装到临时目录了，重来」"),
-            ("安装.md", "微软商店的占位符",
-             "**反面示例**：说明书要让人认出「这是商店占位符，不是真 Python」"),
-            ("安装.md", "不在你这条 PATH 上", "**反面示例**：举例「装了，但不在 PATH 上」"),
+def _v11_patterns():
+    exempt = [
+        ("从这里开始.txt", "没问题，往下走", "正文里的**示范路径**：告诉用户「正常的路径长这样」"),
+        ("从这里开始.txt", "请重新解压到", "**反面示例**：告诉用户「你装到临时目录了，重来」"),
+        ("安装.md", "微软商店的占位符",
+         "**反面示例**：说明书要让人认出「这是商店占位符，不是真 Python」"),
+        ("安装.md", "不在你这条 PATH 上", "**反面示例**：举例「装了，但不在 PATH 上」"),
     ]
-    _user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
-    # 盘符：字母 ＋ 冒号 ＋ 斜杠 ＋ **一个真字符**（字母／数字／下划线／中文／点／波浪线）。
-    # 第三位是硬要求——它是把「正则字面量」和「真路径」分开的那一刀。
-    _pats = [
-            (re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z]:[\\/][A-Za-z0-9_\u4e00-\u9fff.~]"),
-             "盘符绝对路径"),
-            # 项目专属的本机目录名：使用者把自己的填进来（裸目录名，不含盘符），
-            # 例如 (re.compile(r"我的创作目录"), "本机目录名")。
-            # 本仓库不内置任何真实目录名。
-            (re.compile(r"AppData[\\/]|[\\/]AppData"), "AppData 路径"),
-            (re.compile(r"Temp[\\/][A-Za-z]|[\\/]Temp[\\/]"), "Temp 路径"),
+    user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
+    # 盘符后必须有真字符，避免把正则字面量误判成路径。
+    pats = [
+        (re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z]:[\\/][A-Za-z0-9_\u4e00-\u9fff.~]"),
+         "盘符绝对路径"),
+        (re.compile(r"AppData[\\/]|[\\/]AppData"), "AppData 路径"),
+        (re.compile(r"Temp[\\/][A-Za-z]|[\\/]Temp[\\/]"), "Temp 路径"),
     ]
-    if len(_user) >= 3:
-            _pats.append((re.compile(r"[\\/]" + re.escape(_user) + r"[\\/]", re.I), "本机用户名"))
+    if len(user) >= 3:
+        pats.append((re.compile(r"[\\/]" + re.escape(user) + r"[\\/]", re.I), "本机用户名"))
+    return pats, exempt
+
+
+def _v11_scan(root, pats, exempt):
+    ext = (".md", ".txt", ".py", ".html", ".json", ".yml", ".yaml", ".sh", ".js", ".css")
     coord, bare, n_scan, exempted = [], [], 0, []
     for dp, dn, fns in os.walk(root):
-            dn[:] = [d for d in dn if d != ".git"]
-            for fn in fns:
-                if not fn.lower().endswith(EXT_V11):
+        dn[:] = [d for d in dn if d != ".git"]
+        for fn in fns:
+            if not fn.lower().endswith(ext):
+                continue
+            fp = os.path.join(dp, fn)
+            rel = os.path.relpath(fp, root).replace(os.sep, "/")
+            try:
+                txt = open(fp, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            n_scan += 1
+            for i, line in enumerate(txt.splitlines(), 1):
+                if "[坐标-ok]" in line:
                     continue
-                fp = os.path.join(dp, fn)
-                rel = os.path.relpath(fp, root).replace(os.sep, "/")
-                try:
-                    txt = open(fp, encoding="utf-8", errors="replace").read()
-                except OSError:
+                hit = next(((pat, why) for pat, why in pats if pat.search(line)), None)
+                if not hit:
+                    if re.search(r"AppData|Temp", line):
+                        bare.append((rel, i))
                     continue
-                n_scan += 1
-                for i, line in enumerate(txt.splitlines(), 1):
-                    if "[坐标-ok]" in line:
-                        continue
-                    hit = next(((pat, why) for pat, why in _pats if pat.search(line)), None)
-                    if not hit:
-                        if re.search(r"AppData|Temp", line):
-                            bare.append((rel, i))
-                        continue
-                    skip = next((w for b, needle, w in V11_EXEMPT
-                                 if rel.endswith(b) and needle in line), None)
-                    if skip:
-                        exempted.append((rel, i, skip))
-                        continue
-                    coord.append((rel, i, hit[1], line.strip()[:70]))
+                skip = next((w for b, needle, w in exempt
+                             if rel.endswith(b) and needle in line), None)
+                if skip:
+                    exempted.append((rel, i, skip))
+                    continue
+                coord.append((rel, i, hit[1], line.strip()[:70]))
+    return coord, bare, n_scan, exempted
+
+
+def _v11_report(coord, bare, n_scan, exempted, fails, warns):
     if coord:
-            for rel, i, why, snip in coord[:12]:
-                print("  ✗ %s:%d（%s）  %s" % (rel, i, why, snip))
-            if len(coord) > 12:
-                print("     …… 另 %d 处" % (len(coord) - 12))
-            fails.append("V11 包里有 %d 处本机坐标（%s）"
-                         % (len(coord), "／".join(sorted({h[2] for h in coord}))))
+        for rel, i, why, snip in coord[:12]:
+            print("  ✗ %s:%d（%s）  %s" % (rel, i, why, snip))
+        if len(coord) > 12:
+            print("     …… 另 %d 处" % (len(coord) - 12))
+        fails.append("V11 包里有 %d 处本机坐标（%s）"
+                     % (len(coord), "／".join(sorted({h[2] for h in coord}))))
     else:
-            print("  ✅ 扫 %d 个文本文件，0 处可解析为本机路径的坐标" % n_scan)
+        print("  ✅ 扫 %d 个文本文件，0 处可解析为本机路径的坐标" % n_scan)
     for rel, i, w in exempted:
-            print("  ◻ 豁免：%s:%d —— %s" % (rel, i, w))
+        print("  ◻ 豁免：%s:%d —— %s" % (rel, i, w))
     if bare:
-            warns.append("V11 有 %d 行提到 AppData／Temp 但不是路径形态（多半是说明书里的警示语，正常；"
-                         "只提不拦——判据是「坐标换台机器成不成立」，不是「有没有提这个词」）" % len(bare))
+        warns.append("V11 有 %d 行提到 AppData／Temp 但不是路径形态（多半是说明书里的警示语，正常；"
+                     "只提不拦——判据是「坐标换台机器成不成立」，不是「有没有提这个词」）" % len(bare))
 
+
+def check_v11(root, fails, warns):
+    # G-300/G-302 的完整来历见 docs/maintain/验包十三项.md（维护仓，不随包）。
+    print("\nV11 包里没有「这台机器的坐标」")
+    pats, exempt = _v11_patterns()
+    coord, bare, n_scan, exempted = _v11_scan(root, pats, exempt)
+    _v11_report(coord, bare, n_scan, exempted, fails, warns)
     return fails, warns
-
 
 
 def check_v12(root, fails, warns):

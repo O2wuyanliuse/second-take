@@ -298,14 +298,13 @@ def validate(req):
     return errs
 
 
-def do_generate(req):
+def _build_generate_args(req):
     model = req["model"]
     reso = req["resolution_type"]
     w, h = int(req["width"]), int(req["height"])
     num = int(req["num"])
     prompt = req["prompt"]
     refs = [r for r in (req.get("refs") or []) if r.strip()]
-
     cmd = "image2image" if refs else "text2image"   # 必须是 str，不是 list（2026-11-09 修）
     args = [cmd, "--prompt", prompt,
             f"--model_version={model}",
@@ -316,22 +315,11 @@ def do_generate(req):
     if refs:
         args.append("--images")
         args.extend(refs)
+    return args, (w, h, num, refs)
 
-    started = datetime.now()
-    batch = started.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
-    outdir = RUNS / batch
-    outdir.mkdir(parents=True, exist_ok=True)
 
-    credit_before = get_credit()
-
-    ok, data = run_cli(args, timeout=420)
-    if not ok:
-        return {"ok": False, "batch": batch, "error": data,
-                "cmd": " ".join(args[:1] + ["..."]), "credit_before": credit_before}
-
-    submit_id = data.get("submit_id")
+def _collect_results(submit_id, outdir):
     results = []
-
     if submit_id:
         ok2, q = run_cli(["query_result", f"--submit_id={submit_id}",
                           f"--download_dir={outdir}"], timeout=180)
@@ -341,24 +329,37 @@ def do_generate(req):
                 p = Path(rel) if rel else None
                 if p and p.exists():
                     results.append(inspect_image(p))
-    # 兜底：直接扫目录（CLI 有时不给 path 字段）
     if not results:
         for p in sorted(outdir.glob("*.png")) + sorted(outdir.glob("*.jpg")):
             results.append(inspect_image(p))
+    return results
 
-    credit_after = get_credit()
 
-    # 真正扣了多少，只能看 list_task 的 credit_count（user_credit 在权益通道下是瞎的）
-    real_cost = None
+def _query_real_cost(submit_id):
+    # 真正扣了多少只能看 list_task；user_credit 在权益通道下不可靠。
     ok3, lt = run_cli(["list_task"], timeout=90)
     if ok3 and isinstance(lt, list):
         for t in lt:
             if t.get("submit_id") == submit_id:
-                ci = t.get("commerce_info") or {}
-                real_cost = ci.get("credit_count")
-                results.append({"commerce": ci}) if False else None
-                break
+                return (t.get("commerce_info") or {}).get("credit_count")
+    return None
 
+
+def do_generate(req):
+    args, (w, h, num, refs) = _build_generate_args(req)
+    started = datetime.now()
+    batch = started.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+    outdir = RUNS / batch
+    outdir.mkdir(parents=True, exist_ok=True)
+    credit_before = get_credit()
+    ok, data = run_cli(args, timeout=420)
+    if not ok:
+        return {"ok": False, "batch": batch, "error": data,
+                "cmd": " ".join(args[:1] + ["..."]), "credit_before": credit_before}
+    submit_id = data.get("submit_id")
+    results = _collect_results(submit_id, outdir)
+    credit_after = get_credit()
+    real_cost = _query_real_cost(submit_id)
     queue_name = ""
     try:
         dbg = (data.get("queue_info") or {}).get("debug_info") or ""
@@ -367,11 +368,10 @@ def do_generate(req):
             queue_name = m.group(1)
     except Exception:
         pass  # 吞：queue_name 只是可选调试字段，解析失败仍返回空串。
-
     return {
         "ok": True, "batch": batch, "submit_id": submit_id,
         "queue_name": queue_name,
-        "requested": {"width": w, "height": h, "model": model, "reso": reso, "num": num,
+        "requested": {"width": w, "height": h, "model": req["model"], "reso": req["resolution_type"], "num": num,
                       "refs": refs},
         "images": results,
         "credit_before": credit_before, "credit_after": credit_after,

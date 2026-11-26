@@ -134,30 +134,11 @@ def diff_lines(a, b):
                and not x.startswith("+++") and not x.startswith("---"))
 
 
-def check(vol, quiet):
-    name = vol["name"]
-    # 文件缺失必须报出来（2026-11-01 补）：原来直接 open()，缺文件就抛栈崩掉，
-    # 屏幕上是一堆 Traceback，看不出「这一卷根本没核」。缺件 ≠ 核过没问题。
-    for k, label in (("raw", "原文原件"), ("final", "定稿稿")):
-        if not os.path.exists(os.path.join(BASE, vol[k])):
-            P1.append("%s 缺%s（%s）——**这一卷根本没核**，不是「核过没问题」。"
-                      % (name, label, vol[k]))
-            return
-    raw_b = read_bytes(vol["raw"])
-    fin_b = read_bytes(vol["final"])
-    raw_t = raw_b.decode("utf-8")
-    fin_t = fin_b.decode("utf-8")
-
-    raw_l = to_lines(raw_t)
-    fin_l = to_lines(fin_t)
-
-    # ---- 判据 3：同构 ----
+def _check_structure(name, raw_b, fin_b, raw_l, fin_l):
     if len(raw_l) != len(fin_l):
         P1.append("%s 行数与原件不同：原件 %d 行，定稿稿 %d 行。\n"
                   "    「二·补」要求同构（只改字、不加删行）。差 %d 行，先查清是漏改还是多改。"
                   % (name, len(raw_l), len(fin_l), len(fin_l) - len(raw_l)))
-
-    # ---- 换行符 / BOM（提示级，见「段落零缩进」那次教训）----
     if (b"\r\n" in raw_b) != (b"\r\n" in fin_b):
         P2.append("%s 换行符与原件不一致（原件 %s，定稿稿 %s）"
                   % (name, "CRLF" if b"\r\n" in raw_b else "LF",
@@ -165,21 +146,21 @@ def check(vol, quiet):
     if fin_b[:3] == b"\xef\xbb\xbf" and raw_b[:3] != b"\xef\xbb\xbf":
         P2.append("%s 定稿稿带 BOM，原件没有——会把 md5 与首行比对全带偏" % name)
 
-    # ---- 判据 1：计数 ----
+
+def _check_counts(name, vol, raw_l, fin_l):
     rows, seen_header = parse_log(vol["log"])
     if rows is None:
         P1.append("%s 找不到变更记录（%s）。有定稿稿没变更记录＝改了没人知道。"
                   % (name, vol["log"]))
-        return
+        return None
     if not seen_header:
         P1.append("%s 的变更记录里没认出「改动清单」表（%s）。\n"
                   "    表头需同时含「#」「原处」「现文」三样。认不出来＝本脚本读不懂这份记录，\n"
                   "    不是「0 条改动」——先把表头修回去，别让它静默失灵。"
                   % (name, vol["log"]))
-        return
+        return None
     n = len(rows)
     d = diff_lines(raw_l, fin_l)
-
     if n == 0 and d != 0:
         P1.append("%s 变更记录 0 条，但定稿稿与原件差 %d 行——有改动没登记。" % (name, d))
     elif n > 0 and not (n <= d <= n * 2):
@@ -187,18 +168,15 @@ def check(vol, quiet):
                   "    合法区间是 [%d, %d]（替换一处=2 行，纯增删一处=1 行）。\n"
                   "    少于 %d ＝ 登记了却没改；多于 %d ＝ 改了却没登记。"
                   % (name, n, d, n, n * 2, n, n * 2))
+    return rows
 
-    # ---- 判据 2：语义（必须**计数**，不能只判"搜得到"）----
-    # 2026-10-29 反测血案，必须留在这：
-    #   本判据第一版写成「现文能不能搜到」，结果两卷里两处改动文本**完全相同**
-    #   （同一句报时台词在两次循环重放），把循环 1 偷改成 230、记录不动，
-    #   现文照样能在循环 2 那处搜到 → 判据判定「账实相符」，放行了。
-    #   而变更记录里本来就写着警告：「不能靠搜到了就算改过」。
-    #   所以这里一律数出现次数：残留几处、新增几处，都要与记录条数对得上。
+
+def _check_semantics(name, raw_t, fin_t, rows):
+    # 2026-10-29 反测血案：重复文本不能靠「搜得到」判定，必须逐组数出现次数。
+    # 第一版曾把循环 1 偷改成循环 2 已有的同一句台词，旧判据因此假绿。
     groups = {}
     for r in rows:
         groups.setdefault((r["before"], r["after"]), []).append(r)
-
     for (bf, af), items in groups.items():
         cnt = len(items)
         tag = "%s 第 %s 条（%s）" % (name, "／".join(x["no"] for x in items),
@@ -209,26 +187,22 @@ def check(vol, quiet):
         if bf == af:
             P2.append("%s 「原处」与「现文」完全相同，这条记录没法核对" % tag)
             continue
-
-        R = raw_t.count(bf)     # 原件里「原处」出现几次
-        F = fin_t.count(bf)     # 定稿稿里「原处」还剩几次
-        A = fin_t.count(af)     # 定稿稿里「现文」出现几次
-        A0 = raw_t.count(af)    # 原件里「现文」本来就有几次（同文互改时会不为 0）
-
+        R = raw_t.count(bf)
+        F = fin_t.count(bf)
+        A = fin_t.count(af)
+        A0 = raw_t.count(af)
         if R == 0:
             P1.append("%s 「原处」在原件里一次都搜不到。\n"
                       "    原处：%s\n"
                       "    要么记录抄错、要么引的不是原件原句——判据失去依据。"
                       % (tag, bf[:80]))
             continue
-
         if F != R - cnt:
             P1.append("%s 原处残留数不符：原件里有 %d 处，记录登记 %d 处，"
                       "定稿稿里本应只剩 %d 处，实际剩 %d 处。\n"
                       "    原处：%s\n"
                       "    剩多了＝漏改（或改了别处）；剩少了＝没登记的额外改动。"
                       % (tag, R, cnt, R - cnt, F, bf[:80]))
-
         if A != A0 + cnt:
             P1.append("%s 现文出现数不符：原件里本来有 %d 处，登记新增 %d 处，"
                       "定稿稿里应有 %d 处，实际 %d 处。\n"
@@ -236,9 +210,29 @@ def check(vol, quiet):
                       "    少了＝有一处没真改成这个；多了＝改了没登记的同类地方。"
                       % (tag, A0, cnt, A0 + cnt, A, af[:80]))
 
+
+def check(vol, quiet):
+    name = vol["name"]
+    # 缺件必须报 P1：这一卷没核，不是核过没问题，更不能抛栈遮住缺件。
+    for k, label in (("raw", "原文原件"), ("final", "定稿稿")):
+        if not os.path.exists(os.path.join(BASE, vol[k])):
+            P1.append("%s 缺%s（%s）——**这一卷根本没核**，不是「核过没问题」。"
+                      % (name, label, vol[k]))
+            return
+    raw_b = read_bytes(vol["raw"])
+    fin_b = read_bytes(vol["final"])
+    raw_t = raw_b.decode("utf-8")
+    fin_t = fin_b.decode("utf-8")
+    raw_l = to_lines(raw_t)
+    fin_l = to_lines(fin_t)
+    _check_structure(name, raw_b, fin_b, raw_l, fin_l)
+    rows = _check_counts(name, vol, raw_l, fin_l)
+    if rows is None:
+        return
+    _check_semantics(name, raw_t, fin_t, rows)
     if not quiet:
         print("  %s：变更记录 %d 条 ／ diff %d 行 ／ 原件与定稿稿各 %d 行"
-              % (name, n, d, len(raw_l)))
+              % (name, len(rows), diff_lines(raw_l, fin_l), len(raw_l)))
 
 
 def main():

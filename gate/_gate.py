@@ -338,36 +338,26 @@ def _collect_results(allow, why):
     return results
 
 
-def _report_results(results, brief):
+def _print_report_header():
     _nm = project_name()
     print("《%s》· 汇总报告（必经路径是本仓库的 pre-commit 钩子，本页只汇总）" % _nm)
     if _nm == _pname.DEFAULT:
-        # 2026-11-02 外部实测（`G-158`）：README 没填名字的人第一眼看到的是一串占位字符，
-        # 会怀疑拿到的是别人的旧工程。回退是预期行为，但**没解释就等于没设计**。
-        # （注释里别把那串字符照抄进来——`_pname.py --check` 会把所有字面量都算作残留，
-        #  它分不清「硬编码」和「解释硬编码」。见 `G-161`。）
+        # 占位符不是别人的工程；不要把占位字面量写进注释，以免 _pname 误报。
         print("   （「%s」是占位符，不是别人的工程——在 `README.md` 顶部写一行 `> 项目：你的名字` 就换掉）" % _nm)
     print("=" * 46)
     print("")
 
-    blocking = []
-    warning = []
-    no_scope = []
-    skipped = []
 
+def _classify_print_rows(results, brief):
+    blocking, warning, no_scope, skipped = [], [], [], []
     for title, script, code, out in results:
         if code == "SKIP":
             print("⏭ %s（%s）— **跳过**：%s" % (title, script, out))
             print("")
             skipped.append(title)
             continue
-
         if code is None:
-            # 「没装」和「坏了」是两件事。
-            # `_links` 是骨架库专有的检查（通用层引用通不通），项目库没有这个脚本；
-            # 把它当阻断，两个库就永远不可能共用同一份 `_gate.py`——而共用本身比
-            # 多一个检查值钱。**没有这个检查 ≠ 这个检查挂了**，所以跳过并印出来，
-            # 覆盖率里会少一项，看得见。
+            # 没装脚本是不适用，不是脚本坏了；跳过必须印出来并计入覆盖率。
             if "脚本不存在" in out:
                 print("⏭ %s（%s）— **跳过**：本库没装这个脚本" % (title, script))
                 skipped.append(title)
@@ -376,7 +366,6 @@ def _report_results(results, brief):
             print("   %s" % out.strip())
             blocking.append(title)
             continue
-
         if code == 0:
             mark, state = "✅", "通过"
         elif code == 1:
@@ -385,23 +374,21 @@ def _report_results(results, brief):
         else:
             mark, state = "⚠", "有提示"
             warning.append(title)
-
-        # 范围自报检查（2026-11-01 立）：没自报范围的「绿」＝不知道盖住了多少，不当通过。
-        # 这是外行唯一能审的维度——不懂正则，但看得懂「它说自己扫了多少」。
         if "[scope]" not in out:
             state += " ／ ⚠未自报范围"
             no_scope.append(title)
-
         print("%s %s（%s）— %s" % (mark, title, script, state))
         if not brief:
             for ln in out.split("\n"):
                 if any(v in ln for v in VERDICT) and ln.strip():
                     print("   %s" % ln.rstrip())
         print("")
+    return blocking, warning, no_scope, skipped
 
+
+def _print_summary_advice(results, brief, blocking, warning, no_scope, skipped):
     print("=" * 46)
     channel_banner(brief)
-
     total = len(results)
     ok = total - len(blocking) - len(warning) - len(skipped)
     if skipped:
@@ -412,20 +399,16 @@ def _report_results(results, brief):
     fresh = is_fresh_project() and bool(blocking)
     if fresh:
         print("")
-        # 数字现算，不写死（`G-161`）：装没装 skill 会让红项数差一，
-        # 而「九项」这个手写数字上一版就在包里印错过。
         print("→ **新项目第一站**：把正文放进 `00_原著/_原始归档/`，其余 %d 项会跟着松动——"
               % len(blocking))
         print("   **现在一项都不用修**。（那 %d 项红，是因为还没有东西可核，不是因为做错了）"
               % len(blocking))
     print("")
-
     if no_scope:
         print("⚠ %d 项未自报 [scope] 范围：%s" % (len(no_scope), "、".join(no_scope)))
         print("   没有范围自报的「绿」，等于不知道它盖住了多少——**不当通过**。")
         print("   补法：在该脚本开头打一行 `[scope] 扫了什么／跳过了什么／认不出什么`。")
         print("")
-
     if blocking:
         print("✗ %d 项阻断：%s" % (len(blocking), "、".join(blocking)))
         if fresh:
@@ -456,6 +439,12 @@ def _report_results(results, brief):
     print("✅ 全绿：%d 项都过。" % total)
     print("   ⚠ 只代表「机器能判的都过了」——该不该改、写得好不好，本页判不了。")
     return 0
+
+
+def _report_results(results, brief):
+    _print_report_header()
+    blocking, warning, no_scope, skipped = _classify_print_rows(results, brief)
+    return _print_summary_advice(results, brief, blocking, warning, no_scope, skipped)
 
 
 def main():

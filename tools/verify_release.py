@@ -252,13 +252,14 @@ def _scan_ref(a, repo, rows, row, head):
         return report(rows, str(a.repo), sref)
 
 
-def _check_release(a, repo, rows, row, head):
-    # 1 工作区
+def _chk_workspace(repo):
     _, st = repo.ok(["status", "--porcelain"])
     dirty = [l for l in st.splitlines() if l.strip() and not l.startswith("??")]
-    row("1 工作区", ("干净" if not dirty else str(len(dirty)) + " 个改动未提交"), GREEN if not dirty else RED)
+    return [("1 工作区", ("干净" if not dirty else str(len(dirty)) + " 个改动未提交"),
+             GREEN if not dirty else RED)]
 
-    # 2 版本三处
+
+def _chk_version(repo):
     _, ver_raw = repo.ok(["show", "HEAD:VERSION"])
     ver = ver_raw.lstrip("\ufeff").split("·")[0].strip() if ver_raw else ""
     _, latest_raw = repo.ok(["show", "HEAD:latest.json"])
@@ -273,12 +274,12 @@ def _check_release(a, repo, rows, row, head):
     tag_ver = last_tag[1:] if last_tag.startswith("v") else last_tag
     vers = {ver, lver, tag_ver}
     v_ok = ver != "" and len(vers) == 1
-    row("2 版本一致", "VERSION " + (ver or "?") + " / latest " + (lver or "?") + " / 最新 tag " + (last_tag or "无"), GREEN if v_ok else RED)
+    rows = [("2 版本一致", "VERSION " + (ver or "?") + " / latest " + (lver or "?") + " / 最新 tag " + (last_tag or "无"), GREEN if v_ok else RED)]
+    return ver, last_tag, rows
 
-    # 3 标记类型与指向
-    # annotated 是硬要求（轻量标签能被悄悄挪走，不留时间不留人）。
-    # 指向分两种场合：tag 触发时必须是这一次；master 推送时只要求它是 HEAD 的祖先——
-    # 发版之后再有提交是常态，不能因此把 master 的每次推送都判红。
+
+def _chk_tag(a, repo, last_tag):
+    rows = []
     if last_tag:
         _, ttype = repo.ok(["cat-file", "-t", last_tag])
         _, tcommit = repo.ok(["rev-parse", last_tag + "^{commit}"])
@@ -291,72 +292,84 @@ def _check_release(a, repo, rows, row, head):
             anc = repo.run(["merge-base", "--is-ancestor", tcommit.strip(), "HEAD"])[0] == 0
             ok = annotated and anc
             detail = ttype.strip() + " / 指向 " + tcommit[:7] + (" = HEAD" if points_head else "（是 HEAD 的祖先）" if anc else "（既不是 HEAD 也不是它的祖先）")
-        row("3 标记", detail, GREEN if ok else RED)
+        rows.append(("3 标记", detail, GREEN if ok else RED))
     else:
-        row("3 标记", "没有任何 tag", YELLOW)
-
+        rows.append(("3 标记", "没有任何 tag", YELLOW))
     if a.expect_tag:
         same = a.expect_tag == last_tag
-        row("3b CI tag", "触发 tag " + a.expect_tag + " / 最新 tag " + (last_tag or "无"), GREEN if same else RED)
+        rows.append(("3b CI tag", "触发 tag " + a.expect_tag + " / 最新 tag " + (last_tag or "无"), GREEN if same else RED))
+    return rows
 
-    # 词表
-    words = []
-    src = ""
+
+def _chk_words(a, repo):
+    words, src, rows = [], "", []
     if a.words:
         p = Path(a.words)
         if p.exists():
             words = parse_words(p.read_text(encoding="utf-8", errors="replace"))
             src = "外部词表 " + str(p)
-    _, rc_deny = repo.ok(["cat-file", "-e", "HEAD:" + WORDS_FILE])
     if not words:
         rc, deny_text = repo.run(["show", "HEAD:" + WORDS_FILE])
         if rc == 0:
             words = parse_words(deny_text)
             src = "库内词表 " + WORDS_FILE
     if not words:
-        row("4 词表", "没有找到禁用词表（库内没有，也没给 --words）", YELLOW)
+        rows.append(("4 词表", "没有找到禁用词表（库内没有，也没给 --words）", YELLOW))
     else:
-        row("4 词表", str(len(words)) + " 个词 · 来源 " + src, GREEN)
-
-    # 5 禁用词表本身是否在库里（它自含词形，一公开就泄一次）
+        rows.append(("4 词表", str(len(words)) + " 个词 · 来源 " + src, GREEN))
     deny_exists = repo.ok(["cat-file", "-e", "HEAD:" + WORDS_FILE])[0]
     if deny_exists:
-        row("5 词表在库", WORDS_FILE + " 存在于 HEAD（它必须写出禁用词，所以它自己就带一个）", RED)
+        rows.append(("5 词表在库", WORDS_FILE + " 存在于 HEAD（它必须写出禁用词，所以它自己就带一个）", RED))
     else:
-        row("5 词表在库", "不在库里（这是对的设计）", GREEN)
+        rows.append(("5 词表在库", "不在库里（这是对的设计）", GREEN))
+    return words, rows
 
-    # 6 待发 zip
+
+def _chk_zip(a, ver, words):
+    rows = []
     if a.no_zip:
-        row("6 包形状", "已跳过（CI 打包前，--no-zip）", GREEN)
-    else:
-        zip_path = Path(a.zip) if a.zip else None
-        if zip_path is None and ver:
-            cand = Path("D:/dev/second-take-" + ver + "-win.zip")
-            if cand.exists():
-                zip_path = cand
-        if zip_path and zip_path.exists():
-            zsize = zip_path.stat().st_size
-            zsha = sha256_of(zip_path)
-            nfiles, zhits, has_deny, susp = scan_zip(zip_path, words)
-            row("6 包形状", str(nfiles) + " 个文件 · " + str(zsize) + " B · sha256 " + zsha[:8], GREEN if not susp else RED)
-            row("7 包内禁用词", ("0 处" if not zhits else str(len(zhits)) + " 处"), GREEN if not zhits else RED)
-            row("8 词表进包", ("在包里（不许）" if has_deny else "不在包里"), RED if has_deny else GREEN)
-            for fn, ln, text in zhits[:5]:
-                row("", fn + ":" + str(ln) + " " + text, RED)
-            for fn in susp[:5]:
-                row("", "不该进包: " + fn, RED)
-        else:
-            row("6 包形状", "找不到待发 zip" + ("" if a.zip else "（自动找 D:/dev/second-take-" + (ver or "x") + "-win.zip）"), YELLOW)
+        return [("6 包形状", "已跳过（CI 打包前，--no-zip）", GREEN)]
+    zip_path = Path(a.zip) if a.zip else None
+    if zip_path is None and ver:
+        cand = Path("D:/dev/second-take-" + ver + "-win.zip")
+        if cand.exists():
+            zip_path = cand
+    if not (zip_path and zip_path.exists()):
+        return [("6 包形状", "找不到待发 zip" + ("" if a.zip else "（自动找 D:/dev/second-take-" + (ver or "x") + "-win.zip）"), YELLOW)]
+    zsize = zip_path.stat().st_size
+    zsha = sha256_of(zip_path)
+    nfiles, zhits, has_deny, susp = scan_zip(zip_path, words)
+    rows.append(("6 包形状", str(nfiles) + " 个文件 · " + str(zsize) + " B · sha256 " + zsha[:8], GREEN if not susp else RED))
+    rows.append(("7 包内禁用词", ("0 处" if not zhits else str(len(zhits)) + " 处"), GREEN if not zhits else RED))
+    rows.append(("8 词表进包", ("在包里（不许）" if has_deny else "不在包里"), RED if has_deny else GREEN))
+    for fn, ln, text in zhits[:5]:
+        rows.append(("", fn + ":" + str(ln) + " " + text, RED))
+    for fn in susp[:5]:
+        rows.append(("", "不该进包: " + fn, RED))
+    return rows
 
-    # 9 历史
+
+def _chk_history(a, repo, words):
+    rows = []
     if words and not a.no_history:
         n, items = scan_history(repo, words)
-        row("9 历史命中", str(n) + " 处（全历史，" + str(len((repo.ok(["rev-list", "HEAD"])[1]).split())) + " 个提交）", GREEN if n == 0 else RED)
+        rows.append(("9 历史命中", str(n) + " 处（全历史，" + str(len((repo.ok(["rev-list", "HEAD"])[1]).split())) + " 个提交）", GREEN if n == 0 else RED))
         for path, ln, text, commits in items:
-            row("", path + ":" + str(ln) + " " + text + " @ " + ",".join(commits), RED)
+            rows.append(("", path + ":" + str(ln) + " " + text + " " + chr(64) + " " + ",".join(commits), RED))
     elif words:
-        row("9 历史命中", "已跳过（--no-history）", YELLOW)
+        rows.append(("9 历史命中", "已跳过（--no-history）", YELLOW))
+    return rows
 
+
+def _check_release(a, repo, rows, row, head):
+    rows.extend(_chk_workspace(repo))
+    ver, last_tag, version_rows = _chk_version(repo)
+    rows.extend(version_rows)
+    rows.extend(_chk_tag(a, repo, last_tag))
+    words, word_rows = _chk_words(a, repo)
+    rows.extend(word_rows)
+    rows.extend(_chk_zip(a, ver, words))
+    rows.extend(_chk_history(a, repo, words))
     verdict = RED if any(r[2] == RED for r in rows) else (YELLOW if any(r[2] == YELLOW for r in rows) else GREEN)
     return report(rows, str(a.repo), head, verdict)
 

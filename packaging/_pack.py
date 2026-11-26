@@ -552,35 +552,36 @@ def frame_layer(path, head_lines=24):
     return None
 
 
-def collect(dry=False):
-    """返回 [(源绝对路径, 包内相对路径), ...] 和被跳过者的清单。"""
-    plan, skipped = [], []
+def _add_to_plan(plan, skipped, src, rel):
+    if not os.path.isfile(src):
+        skipped.append((rel, "源文件不存在"))
+        return
+    plan.append((src, rel))
+
+
+def _report_decl_errors(no_decl, bad_decl, decl_conflict):
+    if not (no_decl or bad_decl or decl_conflict):
+        return
+    print("✗ 层声明有问题，不打这个包：")
+    for rel in no_decl:
+        print("     缺声明                %s" % rel)
+    for rel in bad_decl:
+        print("     用了已取消的「混合」    %s" % rel)
+    for rel, note in decl_conflict:
+        print("     声明是通用层，却在 EXCLUDE_FRAME 里被排除  %s" % rel)
+        print("        字典给的理由：%s" % note[:96])
+    print()
+    print("   判定依据只有一个：文件头的 `> **层**`。")
+    print("   通用层写法：`> **层**：**通用层**——整份可搬给别的项目。一句话为什么`")
+    print("   项目层写法：`> **层**：**项目层**——**不进分发包**。一句话为什么`")
+    print("   **混合层已取消**：要么把项目部分搬到项目层、本文件变通用层；要么整份判项目层。")
+    print("   声明通用却被字典排除 → 改声明，或把字典那一条删掉。两处不许各说各话。")
+    raise SystemExit(1)
+
+
+def _collect_frame(plan, skipped):
     no_decl, bad_decl, decl_conflict = [], [], []
-
-    def add(src, rel):
-        if not os.path.isfile(src):
-            skipped.append((rel, "源文件不存在"))
-            return
-        plan.append((src, rel))
-
-    # ① Agent框架/
-    #    2026-11-04 改（`G-296`）：**去留依据从手写字典改成读文件头的层声明**。
-    #
-    #    为什么必须改：字典和声明是两套东西，一定会漂。今天实测的漂法是最坏的那种——
-    #    一份文件头上写着「混合层（通用方法＋本项目实例）」，字典没列它，于是整份被
-    #    打进包发出去（`G-295`）。更根本的是：**只要字典还是判定依据，「在文件头写
-    #    层声明」这个动作就永远不影响结果**，而看声明的是人，看字典的只有脚本。
-    #
-    #    现在的规则，只有一条：
-    #      声明 `> **层**：项目层` → 不进包
-    #      声明 `> **层**：**通用层**` → 进包
-    #      没声明／写着已取消的「混合」→ **报错，停打包**（不猜、不兜底）
-    #    为什么不兜底成通用层：进包是**往外发**，发错了收不回来。而在本地漏扫一遍
-    #    只是下次再扫——两边代价不对称，所以这里必须严。
-    #
-    #    `EXCLUDE_FRAME` 保留，但降级成**附注**：只解释「这份虽然是项目层，为什么
-    #    还要特殊处理」（例如包里另给一份模板版）。它不再决定去留；如果它和声明
-    #    打架（声明通用却仍被排除），当场报错，不许各说各话。
+    # G-296 的完整来历见 docs/maintain/代码内长文档/packaging/_pack.py.md（维护仓，不随包）。
     if INCLUDE_FRAME:
         d = os.path.join(ROOT, "Agent框架")
         for fn in sorted(os.listdir(d)):
@@ -601,81 +602,52 @@ def collect(dry=False):
             if fn in EXCLUDE_FRAME:
                 decl_conflict.append((rel, EXCLUDE_FRAME[fn]))
                 continue
-            add(p, rel)
+            _add_to_plan(plan, skipped, p, rel)
+    _report_decl_errors(no_decl, bad_decl, decl_conflict)
 
-    # 声明与字典打架、或声明缺失／档位取消 —— 一律停，不出包
-    if no_decl or bad_decl or decl_conflict:
-        print("✗ 层声明有问题，不打这个包：")
-        for rel in no_decl:
-            print("     缺声明                %s" % rel)
-        for rel in bad_decl:
-            print("     用了已取消的「混合」    %s" % rel)
-        for rel, note in decl_conflict:
-            print("     声明是通用层，却在 EXCLUDE_FRAME 里被排除  %s" % rel)
-            print("        字典给的理由：%s" % note[:96])
-        print()
-        print("   判定依据只有一个：文件头的 `> **层**`。")
-        print("   通用层写法：`> **层**：**通用层**——整份可搬给别的项目。一句话为什么`")
-        print("   项目层写法：`> **层**：**项目层**——**不进分发包**。一句话为什么`")
-        print("   **混合层已取消**：要么把项目部分搬到项目层、本文件变通用层；要么整份判项目层。")
-        print("   声明通用却被字典排除 → 改声明，或把字典那一条删掉。两处不许各说各话。")
-        raise SystemExit(1)
 
-    # ② 标准件
+def _collect_std_scripts(plan, skipped):
     for fn in INCLUDE_STD:
-        add(os.path.join(ROOT, "00_原著", fn), "00_原著/" + fn)
+        _add_to_plan(plan, skipped, os.path.join(ROOT, "00_原著", fn), "00_原著/" + fn)
+    if not INCLUDE_SCRIPTS:
+        return
+    d = os.path.join(ROOT, "00_原著")
+    for fn in sorted(os.listdir(d)):
+        if fn.startswith("_") and fn.endswith(".py"):
+            if fn in EXCLUDE_SCRIPTS:
+                skipped.append(("00_原著/" + fn, EXCLUDE_SCRIPTS[fn]))
+                continue
+            _add_to_plan(plan, skipped, os.path.join(d, fn), "00_原著/" + fn)
 
-    # ③ 脚本
-    if INCLUDE_SCRIPTS:
-        d = os.path.join(ROOT, "00_原著")
-        for fn in sorted(os.listdir(d)):
-            if fn.startswith("_") and fn.endswith(".py"):
-                if fn in EXCLUDE_SCRIPTS:
-                    skipped.append(("00_原著/" + fn, EXCLUDE_SCRIPTS[fn]))
+
+def _collect_skills(plan, skipped):
+    if not INCLUDE_SKILLS:
+        return
+    base = os.path.join(ROOT, "skills")
+    if not os.path.isdir(base):
+        return
+    for skill in sorted(os.listdir(base)):
+        sdir = os.path.join(base, skill)
+        if not os.path.isdir(sdir):
+            continue
+        for dirpath, dirnames, filenames in os.walk(sdir):
+            rel_dir = os.path.relpath(dirpath, base).replace("\\", "/")
+            if any(rel_dir.endswith(s) for s in SKILL_STRIP):
+                skipped.append(("skills/" + rel_dir + "/",
+                                "skill 的项目专属层（含文风红线与设定内核）"))
+                dirnames[:] = []
+                continue
+            dirnames[:] = [x for x in dirnames if x != "__pycache__"]
+            for fn in filenames:
+                why = _should_skip(dirpath, fn)
+                if why:
+                    skipped.append(("skills/%s/%s" % (rel_dir, fn), why))
                     continue
-                add(os.path.join(d, fn), "00_原著/" + fn)
+                _add_to_plan(plan, skipped, os.path.join(dirpath, fn),
+                             "skills/%s/%s" % (rel_dir, fn))
 
-    # ④ skills（剥 projects/）
-    if INCLUDE_SKILLS:
-        base = os.path.join(ROOT, "skills")
-        if os.path.isdir(base):
-            for skill in sorted(os.listdir(base)):
-                sdir = os.path.join(base, skill)
-                if not os.path.isdir(sdir):
-                    continue
-                for dirpath, dirnames, filenames in os.walk(sdir):
-                    rel_dir = os.path.relpath(dirpath, base).replace("\\", "/")
-                    if any(rel_dir.endswith(s) for s in SKILL_STRIP):
-                        skipped.append(("skills/" + rel_dir + "/",
-                                        "skill 的项目专属层（含文风红线与设定内核）"))
-                        dirnames[:] = []
-                        continue
-                    dirnames[:] = [x for x in dirnames if x != "__pycache__"]
-                    for fn in filenames:
-                        why = _should_skip(dirpath, fn)
-                        if why:
-                            skipped.append(("skills/%s/%s" % (rel_dir, fn), why))
-                            continue
-                        add(os.path.join(dirpath, fn),
-                            "skills/%s/%s" % (rel_dir, fn))
 
-    # ⑤ 钩子源
-    if INCLUDE_HOOK_SRC:
-        add(os.path.join(ROOT, INCLUDE_HOOK_SRC), INCLUDE_HOOK_SRC)
-
-    # ⑥ 打包工具的副本：让「整段重复」这条规矩在收包人手里也能跑（2026-11-02，G-154）
-    # 起因＝外部实测第十一轮：「我在这台机器上没有任何运行路径能执行它」——
-    # 规矩写进了发包的清单，工具却没跟出去，等于给了判据不给尺子。
-    # 只建一份实现（源在 packaging/），包里这份是打包时生成，**不会各自漂**。
-    plan.append((os.path.join(HERE, "_dupcheck.py"), "00_原著/_dupcheck.py"))
-
-    # ⑥b 项目私有路径配置：包里给一份**空白模板**。
-    # 为什么必须给：源目录那份是项目层、不进包；而包里的 `_consist.py` 会找这个文件，
-    # 找不到就报 P1（配置丢了和没配是两件事）。给一份空模板 = 「文件在、键不在」，
-    # 正好落在「未启用」那一档，收包人看到的是「这组检查没启用」，不是「包坏了」。
-    plan.append((os.path.join(TPL, "项目配置_空模板.json"), "00_原著/_项目配置.json"))
-
-    # ⑦ 模板（覆盖同名／新建）
+def _collect_templates(plan, skipped):
     for rel_target, tpl_name in TEMPLATES.items():
         src = os.path.join(TPL, tpl_name)
         if not os.path.isfile(src):
@@ -683,6 +655,18 @@ def collect(dry=False):
             continue
         plan.append((src, rel_target))
 
+
+def collect(dry=False):
+    """返回 [(源绝对路径, 包内相对路径), ...] 和被跳过者的清单。"""
+    plan, skipped = [], []
+    _collect_frame(plan, skipped)
+    _collect_std_scripts(plan, skipped)
+    _collect_skills(plan, skipped)
+    if INCLUDE_HOOK_SRC:
+        _add_to_plan(plan, skipped, os.path.join(ROOT, INCLUDE_HOOK_SRC), INCLUDE_HOOK_SRC)
+    plan.append((os.path.join(HERE, "_dupcheck.py"), "00_原著/_dupcheck.py"))
+    plan.append((os.path.join(TPL, "项目配置_空模板.json"), "00_原著/_项目配置.json"))
+    _collect_templates(plan, skipped)
     return plan, skipped
 
 
