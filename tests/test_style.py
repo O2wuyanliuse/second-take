@@ -40,6 +40,30 @@ def test_same_name_and_ast_body_is_a_copy():
     assert all("同名同体函数 run" in issue for issue in issues)
 
 
+def test_all_functions_over_80_are_reported():
+    source = "def run(items):\n" + "    value = items\n" * 80
+    fn = ast.parse(source).body[0]
+    assert "81 行 > 80" in style._length_issue("tools/a.py", fn, set())
+    assert style._length_issue("tools/a.py", fn, {("tools/a.py", "run")}) is None
+    main_fn = ast.parse(source.replace("def run", "def main")).body[0]
+    assert "main 81 行 > 80" in style._length_issue("tools/a.py", main_fn, set())
+
+
+def test_length_exemptions_require_exact_path_function_and_reason(tmp_path, monkeypatch):
+    baseline = tmp_path / "docs" / "maintain" / "_style基线.md"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text(
+        "tools/a.py:run —\n"
+        "tools/b.py:run —   \n"
+        "# tools/c.py:run — 注释不算\n"
+        "tools/d.py:not-a-name — 函数名无效\n"
+        "tools/e.py:run — 已登记的历史原因\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(style, "ROOT", tmp_path)
+    assert style._length_exemptions() == {("tools/e.py", "run")}
+
+
 def test_marked_template_copy_does_not_implicate_other_file():
     issues = duplicates(
         ("templates/checks/a.py", "def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n"),

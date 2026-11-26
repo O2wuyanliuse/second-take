@@ -30,6 +30,31 @@ def _docstring_lines(tree):
     return len(ds.splitlines()) if ds else 0
 
 
+def _length_exemptions():
+    path = ROOT / "docs/maintain/_style基线.md"
+    if not path.exists():
+        return set()
+    exemptions = set()
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", "`")):
+            continue
+        location, sep, reason = line.partition(" — ")
+        if not sep or not reason.strip() or ":" not in location:
+            continue
+        rel, name = location.rsplit(":", 1)
+        if rel.endswith(".py") and name.isidentifier():
+            exemptions.add((rel, name))
+    return exemptions
+
+
+def _length_issue(rel, fn, exemptions):
+    n = _fn_len(fn)
+    if n <= 80 or (rel, fn.name) in exemptions:
+        return None
+    return f"{rel}:{fn.lineno}: {fn.name} {n} 行 > 80"
+
+
 def _marked_duplicate(fn, lines):
     body = lines[fn.lineno - 1:getattr(fn, "end_lineno", fn.lineno)]
     return any("故意重复" in l for l in body[:4])
@@ -89,6 +114,7 @@ def _load_manifest():
 
 def main():
     issues = []
+    exemptions = _length_exemptions()
     seen = defaultdict(lambda: defaultdict(list))
     for p in _iter_files():
         rel = p.relative_to(ROOT).as_posix()
@@ -104,11 +130,9 @@ def main():
             issues.append(f"{rel}: 模块 docstring {d} 行 > 15")
         for fn in ast.walk(tree):
             if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                n = _fn_len(fn)
-                if fn.name == "main" and n > 80:
-                    issues.append(f"{rel}:{fn.lineno}: main {n} 行 > 80")
-                elif fn.name != "main" and n > 300:
-                    issues.append(f"{rel}:{fn.lineno}: {fn.name} {n} 行 > 300")
+                issue = _length_issue(rel, fn, exemptions)
+                if issue:
+                    issues.append(issue)
                 if not fn.name.startswith("test") and fn.name != "__init__":
                     seen[fn.name][_function_fingerprint(fn)].append((rel, fn.lineno, _marked_duplicate(fn, lines), fn))
         for node in ast.walk(tree):
