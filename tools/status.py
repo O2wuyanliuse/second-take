@@ -23,20 +23,14 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from _common import utf8_stdio
+
 REPO = Path(__file__).resolve().parent.parent
 
 # 打印黑名单：这些词属于内部运行，不许出现在用户面。
 BANNED = ("绿", "跳过", "阻断", "门禁", "提示档", "全绿", "退出码 2", "项有提示")
 
 NUM = re.compile(r"\d+")
-
-
-def utf8_stdio() -> None:
-    for s in (sys.stdout, sys.stderr):
-        try:
-            s.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
 
 
 def run_gate(root: Path) -> str:

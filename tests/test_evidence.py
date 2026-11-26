@@ -22,7 +22,11 @@ def load_evidence():
     spec = importlib.util.spec_from_file_location("evidence_under_test",
                                                   REPO / "tools" / "evidence.py")
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    sys.path.insert(0, str(REPO / "tools"))
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        sys.path.pop(0)
     return mod
 
 
@@ -198,6 +202,7 @@ def test_package_without_tests_dir_exits_zero(tmp_path):
     """
     root = fake_repo(tmp_path, with_tests=False)
     shutil.copy2(REPO / "tools" / "evidence.py", root / "tools" / "evidence.py")
+    shutil.copy2(REPO / "tools" / "_common.py", root / "tools" / "_common.py")
 
     r = subprocess.run(
         [sys.executable, str(root / "tools" / "evidence.py"), "--out", "reports/evidence.md"],
@@ -220,6 +225,7 @@ def test_package_with_empty_tests_dir_exits_zero(tmp_path):
     root = fake_repo(tmp_path, with_tests=False)
     (root / "tests").mkdir()
     shutil.copy2(REPO / "tools" / "evidence.py", root / "tools" / "evidence.py")
+    shutil.copy2(REPO / "tools" / "_common.py", root / "tools" / "_common.py")
 
     r = subprocess.run(
         [sys.executable, str(root / "tools" / "evidence.py"), "--out", "reports/evidence.md"],

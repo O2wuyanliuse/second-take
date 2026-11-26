@@ -24,12 +24,13 @@ pytest；让这一页在他那儿第一眼就红，等于把一个可选依赖�
 
 import argparse
 import datetime
-import importlib.util
 import json
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+from _common import pytest_available
 
 # 中文输出在 GBK 控制台会乱码；本库 2026-11-06 在门禁的 ✅ 上踩过。
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -46,18 +47,6 @@ STEPS = (
 )
 
 RED_MARKS = ("❌", "🔴", "✗", "⛔", "FAILED", "ERROR", "Traceback")
-
-
-def pytest_available():
-    """当前解释器里能不能找到 pytest。
-
-    用它而不是跑 `-m pytest --version`：不启子进程，也不为一次探测多等半秒。
-    **找不到不等于环境坏了**——zip 用户手上本来就可能没有 pytest，那不是他的错。
-    """
-    try:
-        return importlib.util.find_spec("pytest") is not None
-    except (ImportError, ValueError):
-        return False
 
 
 def run_cmd(cmd, timeout=900):

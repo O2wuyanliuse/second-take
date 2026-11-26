@@ -19,19 +19,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _common import utf8_stdio
+
 REPO = Path(__file__).resolve().parent.parent
 CONFIG_EXAMPLE = REPO / "config.example.json"
 CONFIG_LOCAL = REPO / "config.local.json"
 SUBDIRS = ("input", "output", "cache")
 MIN_PY = (3, 10)
-
-
-def utf8_stdio():
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
 
 
 def say(msg=""):

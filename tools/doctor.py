@@ -19,12 +19,13 @@
 """
 
 import argparse
-import importlib.util
 import json
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+from _common import pytest_available
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -43,14 +44,6 @@ def git(*args):
         return r.stdout.strip() if r.returncode == 0 else ""
     except OSError:
         return ""
-
-
-def pytest_available():
-    """pytest 在不在。不在不是故障——只是证据页的「用例」会记跳过。"""
-    try:
-        return importlib.util.find_spec("pytest") is not None
-    except (ImportError, ValueError):
-        return False
 
 
 def last_evidence(root):

@@ -114,6 +114,8 @@ tools/_keyout.py
 tools/_mkview.py
 tools/_mkview_flow.py
 tools/asset_measure.py
+# 包内 tools 脚本共享的内部模块；与同目录脚本一起用，用户面零变化。
+tools/_common.py
 tools/bootstrap.py
 tools/doctor.py
 tools/evidence.py

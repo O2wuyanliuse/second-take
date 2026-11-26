@@ -35,6 +35,8 @@ def new_repo(path):
 
 def copy_into(root, *rel_paths):
     """把本仓库的脚本按原相对路径拷进临时仓库（脚本靠 __file__ 找 ROOT）。"""
+    if any(rel.startswith("tools/") for rel in rel_paths):
+        rel_paths = (*rel_paths, "tools/_common.py")
     for rel in rel_paths:
         src = REPO / rel
         dst = Path(root) / rel
