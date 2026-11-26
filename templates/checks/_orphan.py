@@ -39,6 +39,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_cfg():
+    # 故意重复：可单独搬运，见 README
     p = os.path.join(HERE, "checks.config.json")
     if "--config" in sys.argv:
         p = sys.argv[sys.argv.index("--config") + 1]
@@ -66,6 +67,7 @@ INDEX_NAMES = set(CFG.get("orphan", {}).get("index_names", ["_index.md"]))      
 
 
 def walk_md(include_readme=True):
+    # 故意重复：可单独搬运，见 README
     out = []
     for base, dirs, files in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
@@ -84,6 +86,7 @@ PY_SKIP = tuple(CFG.get("orphan", {}).get("py_skip", ["attic", "__pycache__"]))
 
 
 def scan_py():
+    # 故意重复：可单独搬运，见 README
     """扫脚本：既没被任何 md 提到、也没被别的脚本 import 的，报出来。
 
     判据同 md 那条：**它下次还会被打开吗？** 会→留着；不会→归档。

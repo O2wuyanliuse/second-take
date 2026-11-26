@@ -99,6 +99,7 @@ def _free_names(fn):
 
 
 def build():
+    # 故意重复：可单独搬运，见 README
     providers = {}      # 名字 → 提供它的模块
     funcs = {}          # 函数名 → {module, free}
     for path in _files():

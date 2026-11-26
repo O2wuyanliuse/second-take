@@ -56,6 +56,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_cfg():
+    # 故意重复：可单独搬运，见 README
     """同目录 checks.config.json 有就用；`--config` 可覆盖（2026-11-16 脱参数）。"""
     p = os.path.join(HERE, "checks.config.json")
     if "--config" in sys.argv:

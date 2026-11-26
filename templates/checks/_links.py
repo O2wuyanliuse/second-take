@@ -47,6 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_cfg():
+    # 故意重复：可单独搬运，见 README
     """同目录 `checks.config.json` 有就用，没有就用通用缺省（2026-11-16 脱参数）。"""
     p = os.path.join(HERE, "checks.config.json")
     if "--config" in sys.argv:
@@ -91,6 +92,7 @@ CODE_SPAN = re.compile(r"`([^`\n]{2,120})`")
 
 
 def load_allow():
+    # 故意重复：可单独搬运，见 README
     """读 `gate/links_allow.txt`。没写理由的行不算（与 `leak_allow.txt` 同一条纪律）。"""
     path = CFG.get("links", {}).get("allow_file") or os.path.join(HERE, "links_allow.txt")
     if not os.path.isabs(path):
@@ -116,6 +118,7 @@ def load_allow():
 
 
 def walk_md():
+    # 故意重复：可单独搬运，见 README
     out = []
     for dp, dn, fns in os.walk(ROOT):
         dn[:] = [d for d in dn if d not in SKIP_DIRS and not d.startswith(".")]
@@ -126,6 +129,7 @@ def walk_md():
 
 
 def candidates(text):
+    # 故意重复：可单独搬运，见 README
     """从一段 md 里取出「看起来是指向本仓库某个文件的路径」。"""
     seen, out = set(), []
     for m in CODE_SPAN.finditer(text):
@@ -161,6 +165,7 @@ DEBT = ("待建", "待立", "待补", "未建", "拟建", "计划建")
 
 
 def scan_brackets(files, allow):
+    # 故意重复：可单独搬运，见 README
     """第二遍：`[类别]xxx` 的落点在不在。返回 (命中, 候选数)。"""
     stems = set()
     for dp, dn, fns in os.walk(ROOT):

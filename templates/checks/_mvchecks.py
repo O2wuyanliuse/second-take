@@ -24,6 +24,7 @@ SRC = os.path.join(PROJ, "00_原著", "_consist.py")
 
 
 def load():
+    # 故意重复：可单独搬运，见 README
     text = io.open(SRC, encoding="utf-8").read()
     return text, ast.parse(text)
 
