@@ -14,8 +14,8 @@
 | 装不上 / 卡住 | `README.md` 的「三步开工」→ `python tools/doctor.py` |
 | 证明真的跑过 | `python tools/evidence.py`，结果写在 `reports/` 下的 `evidence.md` |
 | 升级到新版 / 回到旧版 | `docs/upgrade.md` |
-| 我维护仓库，要看代码硬约束与变更记录 | `docs/maintain/维护方法.md` |
-| 我要找某段代码搬出去的完整说明 | `docs/maintain/代码内长文档.md` |
+| 我维护仓库，要看代码硬约束与变更记录 | 维护仓 docs/maintain/ 下的 维护方法.md（不随包） |
+| 我要找某段代码搬出去的完整说明 | 维护仓 docs/maintain/ 下的 代码内长文档.md（不随包） |
 | 看历史 | `CHANGELOG.md` |
 | 看这个库到底不是什么 | `README.md` 的「边界与免责」 |
 
