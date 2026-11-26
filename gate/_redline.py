@@ -49,7 +49,7 @@ def is_public():
         d = json.load(io.open(DEFAULTEDGE, encoding="utf-8"))
         return bool(d.get("公开库"))
     except Exception:
-        return False
+        return False  # 吞：配置读不到时按私库处理，避免误判为公开库。
 
 
 # ── R1 必在场的两份 ──

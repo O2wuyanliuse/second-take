@@ -50,7 +50,7 @@ def run_gate(root: Path) -> str:
         )
         return r.stdout or ""
     except Exception:
-        return ""
+        return ""  # 吞：状态页取不到门禁输出时沿用空摘要，由解析层呈现无数据。
 
 
 def parse(out: str) -> dict:

@@ -109,7 +109,7 @@ def scan(target, grams, blob, srcs):
             try:
                 pkg = norm(io.open(fp, encoding="utf-8", errors="ignore").read())
             except Exception:
-                continue
+                continue  # 吞：单文件读不到时跳过，继续扫描其余命中。
             i, last_end = 0, -1
             n = len(pkg)
             while i <= n - K:

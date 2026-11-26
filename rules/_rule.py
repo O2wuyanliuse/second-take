@@ -28,7 +28,7 @@ def rd(p):
     try:
         return io.open(p, encoding="utf-8", errors="replace").read()
     except Exception:
-        return ""
+        return ""  # 吞：读取失败沿用空内容，由调用方按缺件或缺绑定处理。
 
 
 def load_json(p):
@@ -38,7 +38,7 @@ def load_json(p):
     try:
         return json.loads(t)
     except Exception:
-        return None
+        return None  # 吞：JSON 无法解析时返回 None，由调用方报规则或绑定不可用。
 
 
 def shape_of(name):

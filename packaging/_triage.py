@@ -109,7 +109,7 @@ def _scan_target(target, words):
         try:
             lines = io.open(fp, encoding="utf-8", errors="replace").read().split("\n")
         except Exception:
-            continue
+            continue  # 吞：单文件读不到时跳过，继续整理其余候选项。
         for i, ln in enumerate(lines, 1):
             for w in words:
                 if w in ln:

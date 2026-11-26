@@ -36,7 +36,7 @@ def md5(path):
     try:
         return hashlib.md5(open(path, "rb").read()).hexdigest()
     except Exception:
-        return None
+        return None  # 吞：读不到时返回 None，让既有差异逻辑处理缺失摘要。
 
 
 def read_norm(path):

@@ -87,10 +87,55 @@ def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
     assert not marked("    ## 故意重复：标题不算\n")
 
 
+def swallow_issue(source):
+    node = next(node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.ExceptHandler))
+    return style._bare_except(node, source.splitlines())
+
+
+def broad_handler(exception, exit_statement):
+    return (
+        "def f(items):\n"
+        "    for item in items:\n"
+        "        try:\n"
+        "            work()\n"
+        f"        except {exception}:\n"
+        f"            {exit_statement}\n"
+    )
+
+
 def test_swallow_reason_must_share_pass_line():
     hanging = "try:\n    work()\nexcept Exception:\n    pass\n    # 吞：旧写法\n"
     inline = "try:\n    work()\nexcept Exception:\n    pass  # 吞：新写法\n"
-    hanging_node = next(node for node in ast.walk(ast.parse(hanging)) if isinstance(node, ast.ExceptHandler))
-    inline_node = next(node for node in ast.walk(ast.parse(inline)) if isinstance(node, ast.ExceptHandler))
-    assert style._bare_except(hanging_node, hanging.splitlines())
-    assert not style._bare_except(inline_node, inline.splitlines())
+    assert swallow_issue(hanging)
+    assert not swallow_issue(inline)
+
+
+def test_base_exception_and_exception_tuple_silent_exits():
+    for exception, exit_statement in (
+        ("BaseException", "pass"),
+        ("(Exception,)", "continue"),
+        ("(BaseException,)", "return None"),
+    ):
+        assert swallow_issue(broad_handler(exception, exit_statement))
+        inline = exit_statement + "  # 吞：已按规则记录理由"
+        assert not swallow_issue(broad_handler(exception, inline))
+
+
+def test_return_none_hanging_reason_is_red_and_inline_is_green():
+    hanging = broad_handler("Exception", "return None") + "            # 吞：悬挂不算\n"
+    assert swallow_issue(hanging)
+    inline = broad_handler("Exception", "return None  # 吞：无结果即无数据")
+    assert not swallow_issue(inline)
+
+
+def test_silent_return_false_requires_inline_reason():
+    assert swallow_issue(broad_handler("Exception", "return False"))
+    inline = broad_handler("Exception", "return False  # 吞：失败按不可用处理")
+    assert not swallow_issue(inline)
+
+
+def test_specific_exceptions_and_multi_statement_handlers_are_out_of_scope():
+    assert not swallow_issue(broad_handler("(ImportError, ValueError)", "return False"))
+    assert not swallow_issue(broad_handler("OSError", "pass"))
+    multi = broad_handler("Exception", "report()\n            return False")
+    assert not swallow_issue(multi)

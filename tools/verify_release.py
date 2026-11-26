@@ -100,7 +100,7 @@ def scan_zip(path, words):
             try:
                 data = z.read(info).decode("utf-8", "replace")
             except Exception:
-                continue
+                continue  # 吞：单个 zip 成员读取失败时跳过，继续扫描其余文本。
             lowdata = data.lower()
             for w in words:
                 if w.lower() in lowdata:

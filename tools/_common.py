@@ -14,7 +14,7 @@ def pytest_available():
     """是否装了 pytest（只查 module，不实际运行）。"""
     try:
         return importlib.util.find_spec("pytest") is not None
-    except Exception:
+    except (ImportError, ValueError):
         return False
 
 

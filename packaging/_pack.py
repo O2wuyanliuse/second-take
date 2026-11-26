@@ -409,7 +409,7 @@ def _prompt_carriers():
         try:
             txt = io.open(os.path.join(TPL, fn), encoding="utf-8-sig").read()
         except Exception:
-            continue
+            continue  # 吞：单个模板读不到时跳过，其余载体继续对账。
         if PROMPT_HEAD in txt:
             out.append(fn)
     return out

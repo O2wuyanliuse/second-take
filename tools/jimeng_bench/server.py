@@ -170,7 +170,7 @@ def list_prompt_files():
         try:
             txt = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
-            continue
+            continue  # 吞：单个提示词文件读不到时跳过，继续列其余文件。
         if "赛璐璐硬边动画风格" in txt:
             blocks = [b for b in re.findall(r"```\n(.*?)\n```", txt, re.S)
                       if "赛璐璐硬边动画风格" in b]

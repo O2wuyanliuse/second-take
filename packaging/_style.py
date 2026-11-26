@@ -65,16 +65,34 @@ def _marked_duplicate(fn, lines):
     return False
 
 
+def _broad_exception(node):
+    if isinstance(node, ast.Name):
+        return node.id in ("Exception", "BaseException")
+    if isinstance(node, ast.Tuple):
+        return any(_broad_exception(elt) for elt in node.elts)
+    return False
+
+
+def _silent_exit(node):
+    if isinstance(node, (ast.Pass, ast.Continue)):
+        return True
+    return isinstance(node, ast.Return) and (
+        node.value is None or isinstance(node.value, ast.Constant)
+    )
+
+
 def _bare_except(fn, lines):
     if not isinstance(fn, ast.ExceptHandler):
         return False
     if fn.type is None:
         return True
-    if isinstance(fn.type, ast.Name) and fn.type.id == "Exception":
-        if len(fn.body) == 1 and isinstance(fn.body[0], ast.Pass):
-            pass_line = lines[fn.body[0].lineno - 1]
-            return "# 吞：" not in pass_line
-    return False
+    if not _broad_exception(fn.type) or len(fn.body) != 1:
+        return False
+    exit_node = fn.body[0]
+    if not _silent_exit(exit_node):
+        return False
+    _, marker, reason = lines[exit_node.lineno - 1].partition("# 吞：")
+    return not marker or not reason.strip()
 
 
 def _function_fingerprint(fn):
