@@ -57,7 +57,12 @@ def _length_issue(rel, fn, exemptions):
 
 def _marked_duplicate(fn, lines):
     body = lines[fn.lineno - 1:getattr(fn, "end_lineno", fn.lineno)]
-    return any("故意重复" in l for l in body[:4])
+    prefix = "# 故意重复："
+    for line in body[:4]:
+        comment = line.strip()
+        if comment.startswith(prefix) and comment[len(prefix):].strip():
+            return True
+    return False
 
 
 def _bare_except(fn, lines):
@@ -91,8 +96,6 @@ def _duplicate_issues(seen):
             continue
         for locs in variants.values():
             if len({rel for rel, _, _, _ in locs}) < 2:
-                continue
-            if any(marked and rel.startswith("templates/checks/") for rel, _, marked, _ in locs):
                 continue
             for rel, ln, marked, _ in locs:
                 if not marked:

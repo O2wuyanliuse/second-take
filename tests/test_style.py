@@ -64,12 +64,27 @@ def test_length_exemptions_require_exact_path_function_and_reason(tmp_path, monk
     assert style._length_exemptions() == {("tools/e.py", "run")}
 
 
-def test_marked_template_copy_does_not_implicate_other_file():
+def test_marked_template_copy_only_exempts_itself():
     issues = duplicates(
         ("templates/checks/a.py", "def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n"),
         ("tools/b.py", "def run(items):\n    return sorted(items)\n"),
     )
-    assert issues == []
+    assert len(issues) == 1
+    assert issues[0].startswith("tools/b.py:")
+    assert "同名同体函数 run" in issues[0]
+
+
+def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
+    def marked(body):
+        source = "def run(items):\n" + body + "    return sorted(items)\n"
+        fn = ast.parse(source).body[0]
+        return style._marked_duplicate(fn, source.splitlines())
+
+    assert marked("    # 故意重复：模板需独立带走\n")
+    assert not marked("    # 故意重复：\n")
+    assert not marked("    # 故意重复：   \n")
+    assert not marked("    note = '# 故意重复：字符串不算'\n")
+    assert not marked("    ## 故意重复：标题不算\n")
 
 
 def test_swallow_reason_must_share_pass_line():

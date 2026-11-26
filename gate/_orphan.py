@@ -104,6 +104,7 @@ def scan_py():
 
 
 def _md_options():
+    # 故意重复：随包模板须可单独拷贝，此维护仓副本与模板同体。
     show_all = "--all" in sys.argv
     # `--only a.md b.md`：只判这几个文件（pre-commit 传「这次新加的 md」）。
     # **为什么需要这个模式**（2026-11-08 00:1x，`G-492`）：
@@ -167,6 +168,7 @@ def _find_md_rows(only):
 
 
 def _report_md_rows(all_md, files, rows, only, show_all, has_only):
+    # 故意重复：随包模板须可单独拷贝，此维护仓副本与模板同体。
     full = [r for r in rows if r[1] == 0]
     half = [r for r in rows if r[1] > 0 and r[2] == 0]
 

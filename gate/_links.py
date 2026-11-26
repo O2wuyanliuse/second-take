@@ -142,6 +142,7 @@ def walk_md(root=ROOT, skip_dirs=SKIP_DIRS, include_hidden=True, sort=True):
 
 
 def candidates(text):
+    # 故意重复：随包模板须可单独拷贝，此维护仓副本与模板同体。
     """从一段 md 里取出「看起来是指向本仓库某个文件的路径」。"""
     seen, out = set(), []
     for m in CODE_SPAN.finditer(text):
