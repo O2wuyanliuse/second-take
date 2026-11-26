@@ -158,7 +158,7 @@ def main():
                     seen[fn.name][_function_fingerprint(fn)].append((rel, fn.lineno, _marked_duplicate(fn, lines), fn))
         for node in ast.walk(tree):
             if _bare_except(node, lines):
-                issues.append(f"{rel}:{node.lineno}: 裸 except Exception: pass 未写吞的理由")
+                issues.append(f"{rel}:{node.lineno}: 宽异常静默出口未在出口行写吞的理由")
     issues.extend(_duplicate_issues(seen))
     count = _load_manifest()
     if count is not None:
