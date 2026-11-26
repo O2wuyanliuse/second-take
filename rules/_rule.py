@@ -7,7 +7,7 @@
     python rules/_rule.py 同一实体两种定性
     python rules/_rule.py 同一实体两种定性 --bind rules/别的.bind.json
 
-完整说明：docs/maintain/代码内长文档/rules/_rule.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/rules/_rule.py.md
 """
 
 from __future__ import print_function

@@ -6,7 +6,7 @@
     python gate/_links.py --each     # 逐条列
 退出码：`0` 干净 ／ `1` 有断链 ／ `2` 文件都找不到（没查成，不算通过）
 
-完整说明：docs/maintain/代码内长文档/templates/checks/_links.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/templates/checks/_links.py.md
 """
 
 import io

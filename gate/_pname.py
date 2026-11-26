@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """_pname.py — 项目名只认一个来源，其余脚本都来这里取。
 
-完整说明：docs/maintain/代码内长文档/gate/_pname.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/gate/_pname.py.md
 """
 
 import io

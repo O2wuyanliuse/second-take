@@ -6,7 +6,7 @@
   --full   加跑判据自检；--brief 汇总正文但缩短跟进通道。
 退出码：0 通过；1 有阻断；2 有提示；3 安装未完成。
 
-完整说明：docs/maintain/代码内长文档/gate/_gate.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/gate/_gate.py.md
 """
 
 import io

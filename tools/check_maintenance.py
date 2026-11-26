@@ -10,7 +10,7 @@
 
 退出码：0 通过 ／ 1 有提交触犯 ／ 2 没查成（空范围、git 失败）——**2 不是通过**
 
-完整说明：docs/maintain/代码内长文档/tools/check_maintenance.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/check_maintenance.py.md
 """
 
 import argparse

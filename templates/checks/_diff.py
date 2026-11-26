@@ -5,7 +5,7 @@
     python _diff.py            # 全查
     python _diff.py --quiet    # 只出结论
 
-完整说明：docs/maintain/代码内长文档/templates/checks/_diff.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/templates/checks/_diff.py.md
 """
 
 import difflib

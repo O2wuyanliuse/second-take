@@ -6,7 +6,7 @@
     python tools/_keyout.py 原图.jpg -o 抠图.png
     python tools/_keyout.py 原图.jpg -o 抠图.png --tol 30 --soft 20
 
-完整说明：docs/maintain/代码内长文档/tools/_keyout.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/_keyout.py.md
 """
 import argparse
 import sys

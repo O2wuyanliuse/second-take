@@ -1,6 +1,6 @@
 """依赖归属图 —— 判「一项检查能不能整项搬走」（2026-11-17，`G-958`）。
 
-完整说明：docs/maintain/代码内长文档/templates/checks/_depmap.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/templates/checks/_depmap.py.md
 """
 import argparse
 import ast

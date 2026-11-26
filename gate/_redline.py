@@ -7,7 +7,7 @@
 用法
     python _redline.py
 
-完整说明：docs/maintain/代码内长文档/gate/_redline.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/gate/_redline.py.md
 """
 
 from __future__ import print_function

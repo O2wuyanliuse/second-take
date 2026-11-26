@@ -13,7 +13,7 @@
     python tools/release.py --version 0.4.0 --channel stable --severity normal --dry-run
     python tools/release.py --version 0.4.0 --channel stable --severity normal
 
-完整说明：docs/maintain/代码内长文档/tools/release.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/release.py.md
 """
 
 import argparse

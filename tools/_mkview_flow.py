@@ -6,7 +6,7 @@
     python tools/_mkview_flow.py <镜表.md> -o out.html --title "镜表 · 一场"
     python tools/_mkview_flow.py <镜表.md> -o out.html --pick T-04    # 单格页默认打开哪格
 
-完整说明：docs/maintain/代码内长文档/tools/_mkview_flow.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/_mkview_flow.py.md
 """
 
 import io

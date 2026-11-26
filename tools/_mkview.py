@@ -6,7 +6,7 @@
     python _mkview.py 清单.md -o out.html --title "E0·6 对齐扫雷" --mode t2
     python _mkview.py 清单.md -o out.html --options "采纳/覆盖/作废"
 
-完整说明：docs/maintain/代码内长文档/tools/_mkview.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/_mkview.py.md
 """
 import io
 import os

@@ -7,7 +7,7 @@
     python _style_fingerprint.py --base a.txt --base b.txt --check 新稿.md    # 多文件累加
     python _style_fingerprint.py --base 原文.txt --check 新稿.md --json       # 机器可读
 
-完整说明：docs/maintain/代码内长文档/Agent框架/_style_fingerprint.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/Agent框架/_style_fingerprint.py.md
 """
 
 import io

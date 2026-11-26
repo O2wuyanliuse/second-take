@@ -9,7 +9,7 @@
 
 退出码：0 通过 ／ 1 未通过（与报告结论一致，可直接进 CI）
 
-完整说明：docs/maintain/代码内长文档/tools/evidence.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/evidence.py.md
 """
 
 import argparse

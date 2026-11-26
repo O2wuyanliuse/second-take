@@ -9,7 +9,7 @@
 
 退出码：0（体检不拦人；真正拦人的是 `gate/_gate.py`）
 
-完整说明：docs/maintain/代码内长文档/tools/doctor.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/doctor.py.md
 """
 
 import argparse

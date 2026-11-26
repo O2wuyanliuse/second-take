@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """即梦出图工作台 · 甲档
 
-完整说明：docs/maintain/代码内长文档/tools/jimeng_bench/server.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/tools/jimeng_bench/server.py.md
 """
 
 import json

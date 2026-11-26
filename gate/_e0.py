@@ -11,7 +11,7 @@
     python gate/_e0.py --gate     # 同上（门禁调用口径，输出更短）
     python gate/_e0.py --self     # 自测：五种形态，全在内存里造，不写盘
 
-完整说明：docs/maintain/代码内长文档/gate/_e0.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/gate/_e0.py.md
 """
 
 import io

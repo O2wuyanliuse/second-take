@@ -6,7 +6,7 @@
     python _orphan.py --all      # 连引用数一起列，便于抽查
     python _orphan.py --py       # 只看脚本：零引用的 .py（不判红）
 
-完整说明：docs/maintain/代码内长文档/templates/checks/_orphan.py.md
+完整说明（维护仓，不随包）：docs/maintain/代码内长文档/templates/checks/_orphan.py.md
 """
 
 # ---- 输出编码兜底（2026-11-05）--------------------------------------------
