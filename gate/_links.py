@@ -154,14 +154,14 @@ def load_allow():
     return allow, noreason
 
 
-def walk_md():
+def walk_md(root=ROOT, skip_dirs=SKIP_DIRS, include_hidden=True, sort=True):
     out = []
-    for dp, dn, fns in os.walk(ROOT):
-        dn[:] = [d for d in dn if d not in SKIP_DIRS]
+    for dp, dn, fns in os.walk(root):
+        dn[:] = [d for d in dn if d not in skip_dirs and (include_hidden or not d.startswith("."))]
         for fn in fns:
             if fn.lower().endswith(".md"):
                 out.append(os.path.join(dp, fn))
-    return sorted(out)
+    return sorted(out) if sort else out
 
 
 def candidates(text):

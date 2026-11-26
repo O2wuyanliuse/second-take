@@ -36,6 +36,7 @@ import os
 import sys
 
 from _ignore import ignored_dirs, is_ignored
+from _links import walk_md as _walk_md
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -46,17 +47,6 @@ SKIP_DIRS = ignored_dirs()
 #   于是刚接好的入口仍被判半孤儿——排除粒度搞错了，排除的是"被引用"，不是"能引用"）
 SKIP_AS_TARGET = {"README.md"}
 INDEX_NAMES = {"_index.md"}         # 索引本身不算"流程引用"
-
-
-def walk_md(include_readme=True):
-    out = []
-    for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
-        for fn in files:
-            if not fn.endswith(".md"):
-                continue
-            out.append(os.path.join(base, fn))
-    return out
 
 
 # ---- 脚本孤儿（2026-11-13 加）-----------------------------------------------
@@ -148,7 +138,7 @@ def main():
             # **一个每天都在红的闸，第三次就被人关掉。**
             print("孤儿检查（--only）：这次没有新增 md，跳过。")
             return 0
-    all_md = walk_md()                       # 全部：作为引用源
+    all_md = _walk_md(ROOT, SKIP_DIRS, include_hidden=False, sort=False)  # 全部：作为引用源
     files = [p for p in all_md if os.path.basename(p) not in SKIP_AS_TARGET]
     # ⚠ `only` 只收窄「被判的对象」，**引用源仍是全部 md**——
     #   不然新建的件永远找不到「谁提到它」，因为可能提到它的是份老文件。
