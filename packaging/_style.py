@@ -140,6 +140,29 @@ def _load_manifest():
     return n
 
 
+def _check_package_count(root, count):
+    # 打包计数检查不依赖 .ci 词表（词表归 _leakscan）。
+    # rc2＝缺词表黄档，包仍打出，计数照核。
+    # subprocess 起不来／超时是真红，不当「查不了」。
+    try:
+        import zipfile, tempfile, subprocess
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "pkg.zip"
+            r = subprocess.run(
+                [sys.executable, "tools/build_public_package.py", "--repo", str(root), "--out", str(out)],
+                cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            if r.returncode not in (0, 2):
+                return f"打包失败：{r.stdout + r.stderr}"
+            with zipfile.ZipFile(out) as z:
+                files = [n for n in z.namelist() if not n.endswith("/")]
+            if len(files) != count:
+                return f"打包计数 {len(files)} != 清单有效项 {count}"
+    except Exception as e:
+        return f"打包失败：{type(e).__name__}: {e}"
+    return None
+
+
 def main():
     issues = []
     exemptions = _length_exemptions()
@@ -169,20 +192,9 @@ def main():
     issues.extend(_duplicate_issues(seen))
     count = _load_manifest()
     if count is not None:
-        try:
-            import zipfile, tempfile, subprocess
-            with tempfile.TemporaryDirectory() as td:
-                out = Path(td) / "pkg.zip"
-                r = subprocess.run([sys.executable, "tools/build_public_package.py", "--repo", str(ROOT), "--out", str(out), "--words", str(ROOT / ".ci" / "denylist.txt")], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
-                if r.returncode != 0:
-                    issues.append(f"打包失败：{r.stdout + r.stderr}")
-                else:
-                    with zipfile.ZipFile(out) as z:
-                        files = [n for n in z.namelist() if not n.endswith("/")]
-                    if len(files) != count:
-                        issues.append(f"打包计数 {len(files)} != 清单有效项 {count}")
-        except Exception as e:
-            issues.append(f"打包计数检查失败：{e}")
+        issue = _check_package_count(ROOT, count)
+        if issue:
+            issues.append(issue)
     for i in issues:
         print(i)
     print(f"违规 {len(issues)} 条")
