@@ -100,6 +100,7 @@ def rewrite_names(src, mapping):
 
 
 def _dependency_graph(tree, defs):
+    names_all = set(defs)
     # 每个顶层定义分别被谁用到：函数看自由名字，常量看右值里读了谁。
     #   2026-11-17 修：首版只算了函数→名字，漏掉「常量读常量」（如 `RETIRED_SKIP = SKIP + …`），
     #   于是闭包算不出来，搬到一半 `NameError`。**常量也是使用者。**
@@ -153,7 +154,6 @@ def main():
 
     text, tree = load()
     defs = top_defs(tree)
-    names_all = set(defs)
 
     users, reads = _dependency_graph(tree, defs)
 
