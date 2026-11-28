@@ -3,6 +3,7 @@
 
 import ast
 import importlib.util
+import io
 import tokenize
 from collections import defaultdict
 from pathlib import Path
@@ -17,9 +18,10 @@ def duplicates(*sources):
     seen = defaultdict(lambda: defaultdict(list))
     for rel, text in sources:
         tree = ast.parse(text)
+        tokens = [t for t in tokenize.generate_tokens(io.StringIO(text).readline) if t.type == tokenize.COMMENT]
         fn = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
         seen[fn.name][style._function_fingerprint(fn)].append(
-            (rel, fn.lineno, style._marked_duplicate(fn, text), fn)
+            (rel, fn.lineno, style._marked_duplicate(fn, tokens), fn)
         )
     return style._duplicate_issues(seen)
 
@@ -119,7 +121,8 @@ def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
     def marked(body):
         source = "def run(items):\n" + body + "    return sorted(items)\n"
         fn = ast.parse(source).body[0]
-        return style._marked_duplicate(fn, source)
+        tokens = [t for t in tokenize.generate_tokens(io.StringIO(source).readline) if t.type == tokenize.COMMENT]
+        return style._marked_duplicate(fn, tokens)
 
     assert marked("    # 故意重复：模板需独立带走\n")
     assert not marked("    # 故意重复：\n")
@@ -132,7 +135,8 @@ def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
 def test_duplicate_marker_only_counts_exclusive_line():
     def marked(source):
         fn = ast.parse(source).body[0]
-        return style._marked_duplicate(fn, source)
+        tokens = [t for t in tokenize.generate_tokens(io.StringIO(source).readline) if t.type == tokenize.COMMENT]
+        return style._marked_duplicate(fn, tokens)
 
     assert marked("def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n")
     assert not marked("def run(items):\n    value = items  # 故意重复：行尾不算\n    return sorted(items)\n")

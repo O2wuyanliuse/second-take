@@ -80,10 +80,10 @@ def _length_issue(rel, fn, exemptions, name=None):
     return f"{rel}:{fn.lineno}: {name} {n} 行 > 80"
 
 
-def _marked_duplicate(fn, text):
+def _marked_duplicate(fn, tokens):
     prefix = "# 故意重复："
     marked = False
-    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+    for token in tokens:
         if token.type != tokenize.COMMENT or not fn.lineno <= token.start[0] < fn.lineno + 4:
             continue
         if token.line[:token.start[1]].strip():
@@ -207,6 +207,12 @@ def main():
             issues.append(f"{rel}: 语法错误 {e}")
             continue
         parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+        try:
+            comment_tokens = [t for t in tokenize.generate_tokens(io.StringIO(text).readline) if t.type == tokenize.COMMENT]
+            tok_err = None
+        except (tokenize.TokenError, IndentationError) as e:
+            comment_tokens = []
+            tok_err = e
         d = _docstring_lines(tree)
         if d > 15:
             issues.append(f"{rel}: 模块 docstring {d} 行 > 15")
@@ -217,7 +223,9 @@ def main():
                     issues.append(issue)
                 if not fn.name.startswith("test") and fn.name != "__init__":
                     try:
-                        marked = _marked_duplicate(fn, text)
+                        if tok_err is not None:
+                            raise tok_err
+                        marked = _marked_duplicate(fn, comment_tokens)
                     except (tokenize.TokenError, IndentationError) as e:
                         issues.append(f"{rel}:{fn.lineno}: 重复标记扫描失败：{type(e).__name__}: {e}")
                         marked = False
