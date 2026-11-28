@@ -7,7 +7,9 @@
 退出码：0 无违规 ／ 1 有违规。
 """
 import ast
+import io
 import sys
+import tokenize
 from pathlib import Path
 from collections import defaultdict
 
@@ -56,14 +58,16 @@ def _length_issue(rel, fn, exemptions):
     return f"{rel}:{fn.lineno}: {fn.name} {n} 行 > 80"
 
 
-def _marked_duplicate(fn, lines):
-    body = lines[fn.lineno - 1:getattr(fn, "end_lineno", fn.lineno)]
+def _marked_duplicate(fn, text):
     prefix = "# 故意重复："
-    for line in body[:4]:
-        comment = line.strip()
+    marked = False
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.type != tokenize.COMMENT or not fn.lineno <= token.start[0] < fn.lineno + 4:
+            continue
+        comment = token.string.strip()
         if comment.startswith(prefix) and comment[len(prefix):].strip():
-            return True
-    return False
+            marked = True
+    return marked
 
 
 def _broad_exception(node):
@@ -187,7 +191,12 @@ def main():
                 if issue:
                     issues.append(issue)
                 if not fn.name.startswith("test") and fn.name != "__init__":
-                    seen[fn.name][_function_fingerprint(fn)].append((rel, fn.lineno, _marked_duplicate(fn, lines), fn))
+                    try:
+                        marked = _marked_duplicate(fn, text)
+                    except (tokenize.TokenError, IndentationError) as e:
+                        issues.append(f"{rel}:{fn.lineno}: 重复标记扫描失败：{type(e).__name__}: {e}")
+                        marked = False
+                    seen[fn.name][_function_fingerprint(fn)].append((rel, fn.lineno, marked, fn))
         for node in ast.walk(tree):
             if _bare_except(node, lines):
                 issues.append(f"{rel}:{node.lineno}: 宽异常静默出口未在出口行写吞的理由")

@@ -3,6 +3,7 @@
 
 import ast
 import importlib.util
+import tokenize
 from collections import defaultdict
 from pathlib import Path
 
@@ -18,7 +19,7 @@ def duplicates(*sources):
         tree = ast.parse(text)
         fn = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
         seen[fn.name][style._function_fingerprint(fn)].append(
-            (rel, fn.lineno, style._marked_duplicate(fn, text.splitlines()), fn)
+            (rel, fn.lineno, style._marked_duplicate(fn, text), fn)
         )
     return style._duplicate_issues(seen)
 
@@ -78,13 +79,29 @@ def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
     def marked(body):
         source = "def run(items):\n" + body + "    return sorted(items)\n"
         fn = ast.parse(source).body[0]
-        return style._marked_duplicate(fn, source.splitlines())
+        return style._marked_duplicate(fn, source)
 
     assert marked("    # 故意重复：模板需独立带走\n")
     assert not marked("    # 故意重复：\n")
     assert not marked("    # 故意重复：   \n")
     assert not marked("    note = '# 故意重复：字符串不算'\n")
     assert not marked("    ## 故意重复：标题不算\n")
+    assert not marked("    '''\n    # 故意重复：docstring 不算\n    '''\n")
+
+
+def test_duplicate_marker_tokenize_failure_is_red(tmp_path, monkeypatch, capsys):
+    source_dir = tmp_path / "tools"
+    source_dir.mkdir()
+    (source_dir / "a.py").write_text("def run(items):\n    return sorted(items)\n", encoding="utf-8")
+
+    def broken_tokenize(*args):
+        raise tokenize.TokenError("扫描中断", (2, 0))
+
+    monkeypatch.setattr(style, "ROOT", tmp_path)
+    monkeypatch.setattr(style, "_marked_duplicate", broken_tokenize)
+    monkeypatch.setattr(style, "_load_manifest", lambda: None)
+    assert style.main() == 1
+    assert "重复标记扫描失败" in capsys.readouterr().out
 
 
 def swallow_issue(source):
