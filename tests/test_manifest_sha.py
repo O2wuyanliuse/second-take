@@ -6,6 +6,7 @@ build_public_package.py 打出的包带一份 MANIFEST.sha256（逐文件 sha256
 维护侧 check_v13 对包跑绿；tamper 一个文件／删清单 → check_v13 必红。
 V13 在维护侧（packaging/ 不进用户包），包里只放 MANIFEST.sha256 本身。
 """
+import builtins
 import hashlib
 import importlib.util
 import os
@@ -196,3 +197,35 @@ def test_build_count_mismatch_is_red(tmp_path, monkeypatch):
     rc = bpp.main()
     assert rc == 1, rc
     assert not out.exists(), "计数不符应删 zip"
+
+
+def test_check_v13_illegal_path_not_read_outside(pkg, monkeypatch):
+    """R2-2：非法路径 ../outside.md 不入 entries、不进 sha 循环 → 不读包外文件。
+
+    变异：去掉 continue（非法路径仍入 entries）→ sha 循环 open 包外 outside.md，本断言红。
+    """
+    outside = pkg.parent / "outside.md"
+    outside.write_text("包外改坏内容", encoding="utf-8")
+    digest = hashlib.sha256(outside.read_bytes()).hexdigest()
+    mf = pkg / "MANIFEST.sha256"
+    new, replaced = [], False
+    for ln in mf.read_text(encoding="utf-8").splitlines():
+        if not replaced and ln.strip() and not ln.startswith("#"):
+            new.append(digest + "  ../outside.md")
+            replaced = True
+        else:
+            new.append(ln)
+    mf.write_text("\n".join(new) + "\n", encoding="utf-8")
+    opened = []
+    real_open = builtins.open
+
+    def spy_open(file, *a, **k):
+        opened.append(os.path.abspath(os.fspath(file)))
+        return real_open(file, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", spy_open)
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    outside_abs = os.path.abspath(str(outside))
+    assert outside_abs not in opened, f"越界读了包外文件：{opened}"
+    assert any("路径非法" in f for f in fails), fails

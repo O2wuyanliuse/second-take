@@ -648,9 +648,11 @@ def check_v13(root, fails, warns, all_files):
                 bad_lines.append((i, line[:60]))
                 continue
             rel = parts[1].strip()
-            entries[rel] = parts[0].strip()
+            # R2-2：非法路径（绝对／含 ..）先判后 continue——不入 entries、不进 sha 循环，杜绝越界读包外
             if os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
                 bad_paths.append((i, rel))
+                continue
+            entries[rel] = parts[0].strip()
     if "MANIFEST.sha256" in entries:
         print("  ✗ 清单含自身 MANIFEST.sha256 —— 清单不许列自己")
         fails.append("V13 清单含自身")
