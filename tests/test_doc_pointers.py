@@ -21,6 +21,23 @@ def test_changelog_scope_rule_in_maintenance_doc():
     assert "内部改动写维护方法，不进 CHANGELOG" in text
 
 
+def test_pack_entry_marked_deprecated():
+    text = read("packaging/_pack.py")
+    assert "[已停用] 私库整包入口 _pack.py 不再维护；用户包请用 tools/build_public_package.py + publish_manifest.txt" in text
+
+
+def test_pack_entry_shows_deprecation_banner_on_first_screen():
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, "packaging/_pack.py", "--dry-run"],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 2
+    assert "[已停用] 私库整包入口 _pack.py 不再维护" in output
+
+
 def test_package_verifier_has_no_deleted_install_entry():
     text = read("packaging/_verify_package.py")
     assert "安装.md" not in text

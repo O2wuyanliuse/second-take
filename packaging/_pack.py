@@ -943,6 +943,7 @@ def _make_zip(out, do_zip):
 
 
 def main():
+    print("[已停用] 私库整包入口 _pack.py 不再维护；用户包请用 tools/build_public_package.py + publish_manifest.txt")
     preflight_rc = _preflight()
     if preflight_rc is not None:
         return preflight_rc
