@@ -179,23 +179,26 @@ def test_handoff_scope_covers_deep_package_paths_only():
     for rel in ('00_原著/', 'Agent框架/', 'workspace/'):
         assert '`%s`' % rel in AGENTS
     assert '子目录任意深都算' in AGENTS
-    assert '从该 `.md` 所在目录起，逐级向父目录查到盘根' in AGENTS
-    assert '找到本包根的 `开工提示词.md` 才算本包' in AGENTS
+    assert '从该 `.md` 所在目录向上逐级查，找到第一个含 `开工提示词.md` 的祖先即停' in AGENTS
+    assert '只有该祖先就是当前工作区根，才算本包' in AGENTS
+    assert '相对路径从当前工作区 cwd 解析' in AGENTS
 
 
 def test_handoff_deep_subdir_and_ancestor_walk_pinned_together():
-    """R3：子目录任意深 ＋ 逐级向父查到盘根，同段钉住。
+    """R3＋C/H：子目录任意深 ＋ 向上逐级查取最近祖先即停，同段钉住。
 
     保护的场景：00_原著/子/深.md —— 落在 00_原著/ 下任意深，从它所在目录
-    逐级向父找，直到本包根的 开工提示词.md 才算本包。A1 是提示词行为，
-    这里只证字在；活体验收另走放行条，不拿文本断言冒充。
+    向上逐级查，找到第一个含 开工提示词.md 的祖先即停，且该祖先须就是
+    当前工作区根才算本包。A1 是提示词行为，这里只证字在；活体验收另走
+    放行条，不拿文本断言冒充。
     """
     bullet = next(l for l in AGENTS.splitlines()
                   if '已存在的 `.md` 交接件路径' in l)
     assert '子目录任意深都算' in bullet, '深处规则不在第三醒法同段里'
-    assert '从该 `.md` 所在目录起，逐级向父目录查到盘根' in bullet, \
+    assert '从该 `.md` 所在目录向上逐级查，找到第一个含 `开工提示词.md` 的祖先即停' in bullet, \
         '祖先找根规则不在第三醒法同段里'
-    assert '找到本包根的 `开工提示词.md` 才算本包' in bullet
+    assert '只有该祖先就是当前工作区根，才算本包' in bullet
+    assert '相对路径从当前工作区 cwd 解析' in bullet
     assert '`00_原著/`' in bullet, '00_原著/子/深.md 的第一段不在 scope，深处进不来'
     assert '这是续窗，按交接件的下一步直接做' in bullet
 
@@ -206,3 +209,44 @@ def test_handoff_missing_and_external_paths_do_not_fake_wake():
     assert '本包外项目的 `.md` → 不算醒' in AGENTS
     assert '不读那份文件' in AGENTS
     assert AGENTS.count(SLEEP_LINE) == 1
+
+
+def test_handoff_nearest_ancestor_stops_not_disk_root():
+    """C/H 场景①：嵌套两份根取最近祖先即停，不再一路查到盘根。
+
+    包里再套一份带 开工提示词.md 的子根时，从交接件向上找到的第一个
+    祖先就停，不会越过它去认外层根。变异：把「找到第一个含…即停」
+    改回「逐级向父目录查到盘根」→ 本断言红。
+    """
+    bullet = next(l for l in AGENTS.splitlines()
+                  if '已存在的 `.md` 交接件路径' in l)
+    assert '从该 `.md` 所在目录向上逐级查' in bullet
+    assert '找到第一个含 `开工提示词.md` 的祖先即停' in bullet
+    assert '查到盘根' not in bullet, '仍写到盘根＝会越过最近祖先认外层根'
+
+
+def test_handoff_root_must_equal_current_workspace():
+    """C/H 场景②：别份拷贝（根≠当前工作区）里的交接件不醒。
+
+    找到的祖先必须就是当前工作区根才算本包；另一份 second-take
+    拷贝的根不等于当前工作区，故不醒。变异：去掉「只有该祖先就是
+    当前工作区根，才算本包」→ 本断言红。
+    """
+    bullet = next(l for l in AGENTS.splitlines()
+                  if '已存在的 `.md` 交接件路径' in l)
+    assert '只有该祖先就是当前工作区根，才算本包' in bullet
+    assert '本包外项目的 `.md` → 不算醒' in AGENTS
+
+
+def test_handoff_deep_subdir_wakes_relative_from_cwd():
+    """C/H 场景③＋H：深层子目录交接件能醒，相对路径从 cwd 解析。
+
+    子目录任意深都算，向上逐级查能走到根；相对路径写明从当前工作区
+    cwd 解析，不拿脚本所在目录或盘根当基准。变异：去掉「相对路径从
+    当前工作区 cwd 解析」→ 本断言红。
+    """
+    bullet = next(l for l in AGENTS.splitlines()
+                  if '已存在的 `.md` 交接件路径' in l)
+    assert '子目录任意深都算' in bullet
+    assert '从该 `.md` 所在目录向上逐级查' in bullet
+    assert '相对路径从当前工作区 cwd 解析' in bullet
