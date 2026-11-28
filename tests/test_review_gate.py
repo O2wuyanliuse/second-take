@@ -17,6 +17,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from helpers import REPO, commit, write
 
 
@@ -264,7 +266,7 @@ def _git_sh():
         return shell
     git = shutil.which("git")
     if not git:
-        raise AssertionError("本机没有 git，无法验 sh 推送壳")
+        pytest.skip("本机没有 git，无法验 sh 推送壳（前提：本地有 git/sh）")
     git_path = Path(git).resolve()
     candidates = [
         git_path.with_name("sh.exe"),
@@ -274,7 +276,7 @@ def _git_sh():
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
-    raise AssertionError("本机没有 Git sh，无法验 sh 推送壳")
+    pytest.skip("本机没有 Git sh，无法验 sh 推送壳（前提：本地有 git/sh）")
 
 
 def test_installed_forwarder_check_uses_repo_words_not_git_words(
@@ -373,3 +375,39 @@ def test_check_missing_words_fails_closed(sandbox, tmp_path, monkeypatch, capsys
     assert rc == 1
     assert "不能算干净，本次不放行" in out
     assert "但闸不因此放行任何东西" not in out
+
+
+def test_check_blocks_real_leak_with_position(sandbox, tmp_path, monkeypatch, capsys):
+    """R3：词表埋真命中词，check 端到端 rc1 且报命中位置（不只证「找到词表」）。"""
+    mod = load(sandbox, tmp_path / "review", monkeypatch)
+    write(sandbox, "a.py", "print(1)\n")
+    commit(sandbox, "A")
+    write(sandbox, ".ci/denylist.txt", "leaked-secret-token\n")
+    write(sandbox, "secret.py", "x = 'leaked-secret-token'\n")
+    commit(sandbox, "夹带")
+    rc = mod.main(["check"])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "这次要推的内容里有" in out
+    assert "secret.py:1" in out
+
+
+def test_installed_sh_hook_blocks_real_leak(sandbox, tmp_path, monkeypatch):
+    """R3：端到端——真命中词经 sh 推送壳必须 rc1 并报位置。"""
+    review_dir = tmp_path / "review"
+    head = _install_real_gate(sandbox, review_dir, monkeypatch)
+    write(sandbox, ".ci/denylist.txt", "leaked-secret-token\n")
+    write(sandbox, "secret.py", "x = 'leaked-secret-token'\n")
+    commit(sandbox, "夹带")
+    monkeypatch.delenv("SECOND_TAKE_REPO", raising=False)
+    monkeypatch.setenv("SECOND_TAKE_PYTHON", sys.executable)
+    monkeypatch.setenv("SECOND_TAKE_WORDS", str(sandbox / ".ci" / "denylist.txt"))
+    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
+    refs = "refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40)
+    result = subprocess.run(
+        [_git_sh(), ".git/gate/pre-push", "origin", "https://example.invalid/repo.git"],
+        cwd=sandbox, input=refs, capture_output=True, text=True, encoding="utf-8",
+        env=os.environ.copy())
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "这次要推的内容里有" in result.stdout
+    assert "secret.py:1" in result.stdout
