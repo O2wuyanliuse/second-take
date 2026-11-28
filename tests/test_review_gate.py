@@ -318,3 +318,32 @@ def test_installed_sh_hook_routes_stdin_through_all_gates(
         assert "[sec] door %s 绿" % n in result.stdout
     assert "[seal] 逐 ref 核验通过：refs/heads/main" in result.stdout
     assert "can't open file" not in result.stderr
+
+
+def test_prepush_shell_reports_when_no_usable_python(sandbox, tmp_path, monkeypatch):
+    """R1a：候选全是占位壳/坏解释器时，钩子给可读 [blocked]＋试过清单，不静默。"""
+    review_dir = tmp_path / "review"
+    _install_real_gate(sandbox, review_dir, monkeypatch)
+    stub = tmp_path / "stub"
+    stub.mkdir()
+    for name in ("python3", "python", "py"):
+        f = stub / name
+        f.write_text("#!/bin/sh\nexit 9\n", encoding="utf-8", newline="\n")
+        f.chmod(0o755)
+    git = shutil.which("git")
+    assert git, "需要 git 才能跑推送壳"
+    gitdir = str(Path(git).resolve().parent)
+    env = os.environ.copy()
+    env["PATH"] = str(stub) + os.pathsep + gitdir
+    env.pop("SECOND_TAKE_PYTHON", None)
+    env.pop("SECOND_TAKE_REPO", None)
+    env["PYTHONIOENCODING"] = "utf-8"
+    refs = "refs/heads/main %s refs/heads/main %s\n" % ("a" * 40, "0" * 40)
+    result = subprocess.run(
+        [_git_sh(), ".git/gate/pre-push", "origin", "https://example.invalid/repo.git"],
+        cwd=sandbox, input=refs, capture_output=True, text=True, encoding="utf-8", env=env)
+    assert result.returncode == 1, result.stdout + result.stderr
+    both = result.stdout + result.stderr
+    assert "[blocked] 找不到能用的 python" in both
+    assert "试过" in both and "python3" in both
+    assert "SECOND_TAKE_PYTHON" in both

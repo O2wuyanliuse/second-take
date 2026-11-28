@@ -63,24 +63,42 @@ set -u
 root="$(git rev-parse --show-toplevel)" || exit 1
 cd "$root" || exit 1
 
+# 存在不等于可用：Windows 的 python3 常是应用商店占位壳，command -v 有、
+# 真跑 import sys 却 rc=9009/49 静默。所以每个候选都要真探一次。
+py_ok() {
+  { [ -x "$1" ] || command -v "$1" >/dev/null 2>&1; } && "$1" -c "import sys" >/dev/null 2>&1
+}
+
 find_py() {
-  if [ -n "${SECOND_TAKE_PYTHON:-}" ] && [ -x "${SECOND_TAKE_PYTHON}" ]; then
-    echo "${SECOND_TAKE_PYTHON}"; return 0
+  tried=""
+  if [ -n "${SECOND_TAKE_PYTHON:-}" ]; then
+    tried="$tried SECOND_TAKE_PYTHON=${SECOND_TAKE_PYTHON}"
+    if py_ok "${SECOND_TAKE_PYTHON}"; then echo "${SECOND_TAKE_PYTHON}"; return 0; fi
+    echo "[warn] SECOND_TAKE_PYTHON=${SECOND_TAKE_PYTHON} 不可用（不存在或 import sys 失败），往后找。" >&2
   fi
   if [ -f .git/second-take-python ]; then
     p=$(cat .git/second-take-python 2>/dev/null)
-    if [ -n "$p" ] && [ -x "$p" ]; then echo "$p"; return 0; fi
+    if [ -n "$p" ]; then
+      tried="$tried .git/second-take-python=$p"
+      if py_ok "$p"; then echo "$p"; return 0; fi
+      echo "[warn] .git/second-take-python 指的 $p 不可用，往后找。" >&2
+    fi
   fi
   for c in python3 python py; do
-    if command -v "$c" >/dev/null 2>&1; then echo "$c"; return 0; fi
+    tried="$tried $c"
+    if command -v "$c" >/dev/null 2>&1; then
+      if "$c" -c "import sys" >/dev/null 2>&1; then echo "$c"; return 0; fi
+      echo "[warn] $c 在 PATH 里但跑不起来（多半是应用商店占位壳），跳过。" >&2
+    fi
   done
+  echo "[blocked] 找不到能用的 python，无法核验 → 拒绝推送。" >&2
+  echo "  试过：$tried" >&2
+  echo "  装一个真 python，或把解释器路径写进 .git/second-take-python，或设 SECOND_TAKE_PYTHON=<路径>。" >&2
   echo ""
 }
 
 PY=$(find_py)
 if [ -z "$PY" ]; then
-  echo "[blocked] 找不到 python，无法核验 → 拒绝推送。"
-  echo "  装 python，或把解释器路径写进 .git/second-take-python（或设 SECOND_TAKE_PYTHON）。"
   exit 1
 fi
 
