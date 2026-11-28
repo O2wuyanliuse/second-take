@@ -31,3 +31,29 @@ def test_instance_manifest_is_not_user_package_manifest():
     text = read("Agent框架/11_分发说明_v1.md")
     assert "这是**私库实例包**的结构" in text
     assert "对外用户包的文件清单以 `publish_manifest.txt` 为准" in text
+
+
+def test_handoff_template_contains_full_skeleton_and_continuation():
+    text = read("shapes/03_交接形状.md").split("## 七、续窗开工块", 1)[1]
+    for sentence in (
+        "它是一个叫 second-take 的开源方法层",
+        "请你按这个顺序读，读完先别动手",
+        "读完回我三件事",
+        "规矩四条",
+        "每次只给我三个选项",
+        "（second-take · 开工提示词 v1）",
+    ):
+        assert sentence in text
+    assert "0) <上面那份交接件的完整路径>" in text
+    assert "这是续窗，按交接件的下一步直接做" in text
+    assert "第一屏" in text
+
+
+def test_flow_doc_has_same_continuation_hardline():
+    text = read("Agent框架/02_流程层_交接防错.md")
+    assert "续窗硬线" in text
+    assert "这是续窗，按交接件的下一步直接做" in text
+    assert "shapes/03_交接形状.md` 第七节" in text
+    assert "第 0 条写交接件自己的路径" in text
+    assert "不重跑 bootstrap" in text
+    assert "外项目的 `.md` 不醒" in text
