@@ -182,7 +182,8 @@ def test_duplicate_marker_tokenize_failure_is_red(tmp_path, monkeypatch, capsys)
         raise tokenize.TokenError("扫描中断", (2, 0))
 
     monkeypatch.setattr(style, "ROOT", tmp_path)
-    monkeypatch.setattr(style, "_marked_duplicate", broken_tokenize)
+    # F2：真钉 tokenize 失败（原误钉 _marked_duplicate，名实不符）——main 每文件 tokenize 缓存处抛 TokenError
+    monkeypatch.setattr(style.tokenize, "generate_tokens", broken_tokenize)
     monkeypatch.setattr(style, "_load_manifest", lambda: None)
     assert style.main() == 1
     assert "重复标记扫描失败" in capsys.readouterr().out
