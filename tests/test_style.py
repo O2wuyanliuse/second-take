@@ -71,6 +71,21 @@ def test_length_exemptions_require_exact_path_function_and_reason(tmp_path, monk
     assert style._length_exemptions() == {("tools/e.py", "Outer.run")}
 
 
+def test_length_exemption_long_fence_not_closed_by_shorter_run(tmp_path, monkeypatch):
+    baseline = tmp_path / "docs" / "maintain" / "_style基线.md"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text(
+        "````\n"
+        "```\n"
+        "tools/inside.py:run — 四反引号块内三反引号不闭合，此豁免不生效\n"
+        "````\n"
+        "tools/outside.py:run — 块外正常豁免\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(style, "ROOT", tmp_path)
+    assert style._length_exemptions() == {("tools/outside.py", "run")}
+
+
 def test_length_exemption_uses_qualified_name_for_nested_functions():
     source = (
         "def outer():\n"

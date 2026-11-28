@@ -38,14 +38,18 @@ def _length_exemptions():
     if not path.exists():
         return set()
     exemptions = set()
-    fence = None
+    fence = None  # (字符, 长度)：按最长 leading 串跟踪，闭合需同字符且 ≥ 开长度且其余空白
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw.strip()
-        marker = line[:3]
-        if marker in ("```", "~~~"):
+        run_char, run_len = None, 0
+        for ch in ("`", "~"):
+            n = len(line) - len(line.lstrip(ch))
+            if n >= 3 and n > run_len:
+                run_char, run_len = ch, n
+        if run_char is not None:
             if fence is None:
-                fence = marker
-            elif fence == marker:
+                fence = (run_char, run_len)
+            elif fence[0] == run_char and run_len >= fence[1] and not line[run_len:].strip():
                 fence = None
             continue
         if fence or not line or line.startswith(("#", "`")):
