@@ -132,7 +132,7 @@ def run_cli(args, timeout=300):
     """调 CLI，返回 (ok, dict_or_text)。统一 UTF-8 解码，Windows 上不猜 GBK。"""
     exe = find_cli()
     if not exe:
-        return False, {"error": "找不到 dreamina。先跑 tools/jimeng_bench 里 README 的安装步骤。"}
+        return False, {"error": "找不到 dreamina。先 pip install dreamina，再 dreamina login。"}
     try:
         p = subprocess.run(
             [exe] + args,

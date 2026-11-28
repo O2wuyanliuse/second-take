@@ -8,7 +8,7 @@
 - 主：`https://github.com/O2wuyanliuse/second-take/releases/download/vX.Y.Z/second-take-X.Y.Z-win.zip`
 - 备：`https://codeload.github.com/O2wuyanliuse/second-take/zip/refs/heads/master`
 
-备链是**源码包**（下下来自己跑 `packaging/_pack.py` 打包），实测 0.53s，比任何镜像都快。某个域名抽风时不至于断。
+备链是**源码快照**，适合主链不通时取回代码；发布成品仍用主链。某个域名抽风时不至于断。
 主链不通时先给人备链，**别让人卡在「下不到」这一步**——2026-11-17 就卡过一次。
 
 ## v1.0.7 · 2026-11-26
