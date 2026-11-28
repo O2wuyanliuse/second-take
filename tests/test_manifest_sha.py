@@ -178,3 +178,21 @@ def test_check_v13_extra_file_not_listed_is_red(pkg):
     fails, warns = [], []
     vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
     assert any("未列入清单" in f for f in fails), fails
+
+
+def test_build_count_mismatch_is_red(tmp_path, monkeypatch):
+    """R2-1：scan_zip 报的包内文件数 != 打包清单 → 并进 bad，rc1 且 zip 被删。
+
+    变异：去掉 bad 里的 or n != len(files) + 1 → 计数不符只打印不判红，本断言红。
+    """
+    spec = importlib.util.spec_from_file_location("bpp_under_test", ROOT / "tools" / "build_public_package.py")
+    bpp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bpp)
+    out = tmp_path / "pkg.zip"
+    words = ROOT / ".ci" / "denylist.txt"
+    monkeypatch.setattr(sys, "argv", [
+        "build_public_package.py", "--repo", str(ROOT), "--out", str(out), "--words", str(words)])
+    monkeypatch.setattr(bpp, "scan_zip", lambda *a, **k: (0, [], False, []))
+    rc = bpp.main()
+    assert rc == 1, rc
+    assert not out.exists(), "计数不符应删 zip"

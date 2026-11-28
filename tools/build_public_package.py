@@ -141,7 +141,7 @@ def main():
         n, hits, has_deny, susp = scan_zip(out, words)
         if n != len(files) + 1:
             print("包内文件数 " + str(n) + " ≠ 打包清单 " + str(len(files) + 1))
-        bad = bool(hits) or has_deny or bool(susp)
+        bad = bool(hits) or has_deny or bool(susp) or n != len(files) + 1
         if bad:
             for fn, ln, text in hits[:10]:
                 print("命中  " + fn + ":" + str(ln) + " " + text)
