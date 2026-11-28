@@ -12,6 +12,7 @@ from pathlib import Path
 from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parent.parent
+_PACK_TIMEOUT = 120
 
 
 def _iter_files():
@@ -151,6 +152,7 @@ def _check_package_count(root, count):
             r = subprocess.run(
                 [sys.executable, "tools/build_public_package.py", "--repo", str(root), "--out", str(out)],
                 cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=_PACK_TIMEOUT,
             )
             if r.returncode not in (0, 2):
                 return f"打包失败：{r.stdout + r.stderr}"

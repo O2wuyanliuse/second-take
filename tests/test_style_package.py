@@ -42,3 +42,17 @@ def test_package_builder_failure_is_red(monkeypatch):
     issue = style._check_package_count(ROOT, 112)
     assert "打包失败" in issue
     assert "boom" in issue
+
+
+def test_package_builder_timeout_is_red(monkeypatch):
+    seen = {}
+
+    def slow_pack(*args, **kwargs):
+        seen["timeout"] = kwargs.get("timeout")
+        raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout"))
+
+    monkeypatch.setattr(subprocess, "run", slow_pack)
+    issue = style._check_package_count(ROOT, 112)
+    assert seen["timeout"] == 120
+    assert "打包失败" in issue
+    assert "TimeoutExpired" in issue
