@@ -8,7 +8,9 @@
 """
 
 import importlib.util
+import io
 import json
+from types import SimpleNamespace
 
 from helpers import REPO, commit, write
 
@@ -104,3 +106,60 @@ def test_sign_refuses_same_person(sandbox, tmp_path, monkeypatch):
     assert rc == 1, "同名（大小写不同也算）必须拒签"
     assert not (tmp_path / "review").exists() or not list(
         (tmp_path / "review").glob("*.json"))
+
+
+def test_prepush_forwards_the_same_stdin_to_seal(sandbox, tmp_path, monkeypatch):
+    """回执检查之后，verify_release 仍须收到完整非空 refs。"""
+    mod = load(sandbox, tmp_path / "review", monkeypatch)
+    refs = "refs/heads/main abc123 refs/heads/main def456\n"
+    monkeypatch.setattr(mod.sys, "stdin", io.StringIO(refs))
+    monkeypatch.setattr(mod, "cmd_check", lambda args: 0)
+    monkeypatch.setattr(mod, "_run_security_surface", lambda: 0)
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    rc = mod.main(["pre-push", "origin", "https://example.invalid/repo.git"])
+    assert rc == 0
+    assert len(calls) == 1
+    cmd, kwargs = calls[0]
+    assert cmd[1:] == ["tools/verify_release.py", "--push-gate", "--words",
+                       str(sandbox / ".ci" / "denylist.txt"), "--repo", str(sandbox)]
+    assert kwargs["input"] == refs
+
+
+def test_prepush_empty_stdin_is_red(sandbox, tmp_path, monkeypatch, capsys):
+    mod = load(sandbox, tmp_path / "review", monkeypatch)
+    monkeypatch.setattr(mod.sys, "stdin", io.StringIO("\n"))
+    monkeypatch.setattr(mod, "cmd_check", lambda args: 0)
+
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("空 refs 不能交给下游假装核过")
+
+    monkeypatch.setattr(mod.subprocess, "run", must_not_run)
+    rc = mod.main(["pre-push"])
+    assert rc == 1
+    assert "没收到推送清单（stdin 空），封条核不了 refs" in capsys.readouterr().out
+
+
+def test_install_refreshes_copy_and_backs_up_old_hook(
+        sandbox, tmp_path, monkeypatch):
+    mod = load(sandbox, tmp_path / "review", monkeypatch)
+    write(sandbox, "tools/review_gate.py", "# refreshed gate\n")
+    write(sandbox, ".git/gate/pre-push", "#!/bin/sh\n# old hook\n")
+    write(sandbox, ".git/gate/review_gate.py", "# stale gate\n")
+    monkeypatch.setattr(mod, "sh", lambda *args, **kwargs: SimpleNamespace(
+        returncode=0, stderr=""))
+    rc = mod.main(["install", "--repo", str(sandbox)])
+    assert rc == 0
+    gate = sandbox / ".git" / "gate"
+    assert (gate / "review_gate.py").read_text(encoding="utf-8") == "# refreshed gate\n"
+    backups = list(gate.glob("pre-push.bak-*"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == "#!/bin/sh\n# old hook\n"
+    hook = (gate / "pre-push").read_text(encoding="utf-8")
+    assert 'cd "$(git rev-parse --git-path gate)"' in hook
+    assert 'python review_gate.py pre-push "$@"' in hook

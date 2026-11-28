@@ -20,6 +20,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -239,17 +240,68 @@ def cmd_check(args):
     return 0
 
 
+def _run_security_surface():
+    """本机安全检查面保持原位；rc=1 硬拦，rc=2 仍只提示。"""
+    sec = Path.home() / ".second-take" / "checks" / "sec_surface.py"
+    if not sec.is_file():
+        return 0
+    r = subprocess.run([sys.executable, str(sec), "--repo", str(ROOT)])
+    if r.returncode == 1:
+        print("[gate] 安全检查面没过，推送拦住了。")
+        return 1
+    return 0
+
+
+def cmd_prepush(args):
+    """stdin 只取一次；同一份推送清单交给逐 ref 封条核验。"""
+    refs_text = sys.stdin.read()
+    args.words = (args.words or os.environ.get("SECOND_TAKE_WORDS")
+                  or str(ROOT / ".ci" / "denylist.txt"))
+    rc = cmd_check(args)
+    if rc:
+        return rc
+    if not refs_text.strip():
+        print("[停一下] 没收到推送清单（stdin 空），封条核不了 refs")
+        return 1
+    if _run_security_surface():
+        return 1
+    r = subprocess.run(
+        [sys.executable, "tools/verify_release.py", "--push-gate",
+         "--words", args.words, "--repo", str(ROOT)],
+        input=refs_text, text=True, encoding="utf-8", cwd=str(ROOT))
+    return r.returncode
+
+
 def cmd_install(args):
-    """把 core.hooksPath 指到 `.git/gate`，并确认壳在。"""
+    """刷新本机闸副本与 pre-push 壳；旧壳先留时间戳备份。"""
     repo = Path(args.repo).resolve() if args.repo else ROOT
+    source = repo / "tools" / "review_gate.py"
+    if not source.is_file():
+        print("[失败] 找不到闸逻辑：" + str(source))
+        return 1
+    gate = repo / ".git" / "gate"
+    gate.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, gate / "review_gate.py")
+    hook = gate / "pre-push"
+    if hook.is_file():
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup = gate / ("pre-push.bak-" + stamp)
+        n = 1
+        while backup.exists():
+            backup = gate / ("pre-push.bak-" + stamp + "-" + str(n))
+            n += 1
+        shutil.copy2(hook, backup)
+        print("[备份] 旧 pre-push → " + backup.name)
+    hook.write_text(
+        "#!/bin/sh\n"
+        "cd \"$(git rev-parse --git-path gate)\" && "
+        "python review_gate.py pre-push \"$@\"\n",
+        encoding="utf-8", newline="\n")
     r = sh("git", "config", "core.hooksPath", ".git/gate", cwd=repo)
     if r.returncode != 0:
         print("[失败] 设不上 core.hooksPath：" + r.stderr.strip()[:160])
         return 1
-    gate = repo / ".git" / "gate"
-    if not (gate / "review_gate.py").is_file():
-        print("[提醒] " + str(gate) + " 里没有 review_gate.py 壳——钩子会缺入口。")
-    print("[ok] core.hooksPath = .git/gate（" + str(repo) + "）")
+    print("[ok] 闸副本与 pre-push 已刷新；core.hooksPath = .git/gate（" + str(repo) + "）")
     return 0
 
 
@@ -267,7 +319,12 @@ def main(argv=None):
     p.add_argument("--words", default=None)
     p.set_defaults(func=cmd_check)
 
-    p = sub.add_parser("install", help="把 hooksPath 指到 .git/gate")
+    p = sub.add_parser("pre-push", help="本地推送链：回执、安全检查面、逐 ref 封条")
+    p.add_argument("--words", default=None)
+    p.add_argument("hook_args", nargs="*", help="git 传入的 remote 与 URL，原样忽略")
+    p.set_defaults(func=cmd_prepush)
+
+    p = sub.add_parser("install", help="刷新本机闸副本与 pre-push 壳")
     p.add_argument("--repo", default=None)
     p.set_defaults(func=cmd_install)
 
