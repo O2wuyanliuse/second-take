@@ -72,6 +72,18 @@ def test_handoff_template_contains_full_skeleton_and_continuation():
     assert "第一屏" in text
 
 
+def test_verifier_v13_scope_and_skip_documented():
+    text = read("docs/maintain/维护方法.md")
+    assert "V13 跳过：旧实例包不带清单" in text
+    assert "只看 V13 那一行" in text
+    assert "整体 rc 必为 1" in text
+    assert "早拒不读体，客户端可能收到连接重置" in text
+    v = read("docs/maintain/验包十三项.md")
+    assert "跳过：旧实例包不带清单" in v
+    assert "只看 V13 行" in v
+    assert "旧实例包" in v
+
+
 def test_flow_doc_has_same_continuation_hardline():
     text = read("Agent框架/02_流程层_交接防错.md")
     assert "续窗硬线" in text

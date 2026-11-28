@@ -112,3 +112,69 @@ def test_check_v13_missing_manifest_is_red(pkg):
     fails, warns = [], []
     vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
     assert any("缺 MANIFEST.sha256" in f for f in fails), fails
+
+
+def test_check_v13_old_instance_without_manifest_skips(tmp_path):
+    """R1-A：旧实例包（_pack 产物，带 从这里开始.txt／00_原著/）无清单 → 只 warn 跳过，不阻断。
+
+    变异：去掉 check_v13 的包类型分流 → 旧包缺清单也 fail，本断言红。
+    """
+    root = tmp_path / "oldpkg"
+    root.mkdir()
+    (root / "从这里开始.txt").write_text("旧实例包入口", encoding="utf-8")
+    (root / "00_原著").mkdir()
+    fails, warns = [], []
+    vp.check_v13(str(root), fails, warns, _all_files(root))
+    assert fails == [], fails
+    assert any("V13 跳过：旧实例包不带清单" in w for w in warns), warns
+
+
+def test_check_v13_subprocess_on_built_package(pkg):
+    """R1-A：维护侧真能跑——子进程对真打的用户包跑验包器，V13 那一行绿。
+
+    用户包跑验器整体 rc 必为 1（V1/V6/V3/V7 查项目内容），只看 V13 行判清单自洽。
+    """
+    r = subprocess.run(
+        [sys.executable, "packaging/_verify_package.py", str(pkg)],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+    )
+    out = r.stdout + r.stderr
+    assert "V13" in out, out
+    assert "112 个文件 sha256 全核过" in out, out
+
+
+def test_check_v13_path_traversal_is_red(pkg):
+    """R1-B：清单行换成 ../outside.md（outside 放改坏内容）→ 拒含 .. 路径，必红。"""
+    outside = pkg.parent / "outside.md"
+    outside.write_text("改坏内容", encoding="utf-8")
+    digest = hashlib.sha256(outside.read_bytes()).hexdigest()
+    mf = pkg / "MANIFEST.sha256"
+    new, replaced = [], False
+    for ln in mf.read_text(encoding="utf-8").splitlines():
+        if not replaced and ln.strip() and not ln.startswith("#"):
+            new.append(digest + "  ../outside.md")
+            replaced = True
+        else:
+            new.append(ln)
+    mf.write_text("\n".join(new) + "\n", encoding="utf-8")
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("路径非法" in f for f in fails), fails
+
+
+def test_check_v13_deleted_file_kept_line_is_red(pkg):
+    """R1-B：删一个包内文件、不删清单行 → 集合不等（missing），必红。"""
+    victim = next(iter(_manifest_entries(pkg)))
+    (pkg / victim).unlink()
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("V13" in f for f in fails), fails
+    assert any("缺失" in f for f in fails), fails
+
+
+def test_check_v13_extra_file_not_listed_is_red(pkg):
+    """R1-B：包里多一个清单没列的文件 → 集合不等（extra），必红。"""
+    (pkg / "stowaway.txt").write_text("包里有但清单没列", encoding="utf-8")
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("未列入清单" in f for f in fails), fails

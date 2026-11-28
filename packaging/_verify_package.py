@@ -619,18 +619,26 @@ def check_v12(root, fails, warns):
     return fails, warns
 
 def check_v13(root, fails, warns, all_files):
-    # ── V13 包内 MANIFEST.sha256 自洽（2026-11-28，ST1.0.9 A）──
-    # 维护侧对打好的包（解压目录）跑：逐行核 sha256(包内该文件字节)==行值；
-    # 核清单不含自身；行数==包内文件数−1。缺清单／行不符→阻断。
+    # ── V13 包内 MANIFEST.sha256 自洽（2026-11-28，ST1.0.9 A；R1 按包类型分流＋集合相等）──
+    # 维护侧对打好的包（解压目录）跑：逐行核 sha256(包内该文件字节)==行值；核清单不含自身；
+    # 行数==包内文件数−1；集合相等（missing/extra 都报）；拒绝对路径与含 .. 的路径。
+    # 旧实例包（_pack 产物）无清单 → 只 warn 跳过；用户包缺清单／行不符 → 阻断。
     # 包里只放 MANIFEST.sha256 本身，本检查在维护侧（packaging/ 不进用户包）。
     print("\nV13 包内 MANIFEST.sha256 自洽")
     mf = os.path.join(root, "MANIFEST.sha256")
+    # R1-A 按包类型分流：旧实例包（_pack 产物，带 从这里开始.txt／00_原著/）本就不带清单 → 只 warn 跳过，不阻断
+    old_instance = os.path.isfile(os.path.join(root, "从这里开始.txt")) or os.path.isdir(os.path.join(root, "00_原著"))
     if not os.path.isfile(mf):
+        if old_instance:
+            print("  ⚠ V13 跳过：旧实例包不带清单")
+            warns.append("V13 跳过：旧实例包不带清单")
+            return fails, warns
         print("  ✗ 缺 MANIFEST.sha256 —— 包里没有自洽清单")
         fails.append("V13 缺 MANIFEST.sha256")
         return fails, warns
     entries = {}
     bad_lines = []
+    bad_paths = []
     with open(mf, encoding="utf-8") as fh:
         for i, line in enumerate(fh.read().splitlines(), 1):
             if not line.strip() or line.startswith("#"):
@@ -639,10 +647,30 @@ def check_v13(root, fails, warns, all_files):
             if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
                 bad_lines.append((i, line[:60]))
                 continue
-            entries[parts[1].strip()] = parts[0].strip()
+            rel = parts[1].strip()
+            entries[rel] = parts[0].strip()
+            if os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
+                bad_paths.append((i, rel))
     if "MANIFEST.sha256" in entries:
         print("  ✗ 清单含自身 MANIFEST.sha256 —— 清单不许列自己")
         fails.append("V13 清单含自身")
+    for i, rel in bad_paths:
+        print("  ✗ 第 %d 行路径非法（绝对路径或含 ..）：%s" % (i, rel))
+        fails.append("V13 清单第 %d 行路径非法：%s" % (i, rel))
+    # R1-B 集合相等：清单条目集合 == 包内文件集合 − 自身（missing／extra 都报）
+    actual = {os.path.relpath(fp, root).replace(os.sep, "/") for fp in all_files}
+    actual.discard("MANIFEST.sha256")
+    listed = set(entries)
+    missing = sorted(listed - actual)
+    extra = sorted(actual - listed)
+    for rel in missing:
+        print("  ✗ 清单列了但包里没有：%s" % rel)
+    for rel in extra:
+        print("  ✗ 包里有但清单没列：%s" % rel)
+    if missing:
+        fails.append("V13 清单 %d 项在包内缺失" % len(missing))
+    if extra:
+        fails.append("V13 包内 %d 个文件未列入清单" % len(extra))
     n_files = len(all_files)
     if len(entries) != n_files - 1:
         print("  ✗ 清单 %d 行 != 包内文件数 %d − 1" % (len(entries), n_files))
@@ -664,7 +692,7 @@ def check_v13(root, fails, warns, all_files):
         for rel, why in mism[:20]:
             print("  ✗ %s —— %s" % (rel, why))
         fails.append("V13 %d 个文件 sha256 不符或缺失" % len(mism))
-    elif not bad_lines and "MANIFEST.sha256" not in entries and len(entries) == n_files - 1:
+    elif not bad_lines and not bad_paths and not missing and not extra and "MANIFEST.sha256" not in entries and len(entries) == n_files - 1:
         print("  ✅ %d 个文件 sha256 全核过，清单不含自身" % len(entries))
     return fails, warns
 
