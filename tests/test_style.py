@@ -117,6 +117,27 @@ def test_marked_template_copy_only_exempts_itself():
     assert "同名同体函数 run" in issues[0]
 
 
+def test_main_uses_tokenize_cache_and_marked_exemption(tmp_path, monkeypatch, capsys):
+    """F1：走 main() 全流——每文件 tokenize 一次缓存，标 故意重复 的豁免、未标的报。
+
+    钉主流程真用 tokenize 缓存：a.py 标记豁免、b.py 未标 → 只报 b.py 一条。
+    变异：main 不按文件缓存 comment_tokens／不认标记 → 报 2 条或 0 条，本断言红。
+    """
+    tools_dir = tmp_path / "tools"
+    tools_dir.mkdir()
+    (tools_dir / "a.py").write_text(
+        "def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n", encoding="utf-8")
+    (tools_dir / "b.py").write_text(
+        "def run(items):\n    return sorted(items)\n", encoding="utf-8")
+    monkeypatch.setattr(style, "ROOT", tmp_path)
+    monkeypatch.setattr(style, "_load_manifest", lambda: None)
+    assert style.main() == 1
+    out = capsys.readouterr().out
+    assert "同名同体函数 run" in out
+    assert "tools/b.py" in out
+    assert "违规 1 条" in out
+
+
 def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
     def marked(body):
         source = "def run(items):\n" + body + "    return sorted(items)\n"
