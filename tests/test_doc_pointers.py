@@ -15,6 +15,12 @@ def test_backup_download_is_source_snapshot():
     assert "下下来自己跑 `packaging/_pack.py` 打包" not in text
 
 
+def test_changelog_scope_rule_in_maintenance_doc():
+    text = read("docs/maintain/维护方法.md")
+    assert "CHANGELOG 只写用户能感知的变化" in text
+    assert "内部改动写维护方法，不进 CHANGELOG" in text
+
+
 def test_package_verifier_has_no_deleted_install_entry():
     text = read("packaging/_verify_package.py")
     assert "安装.md" not in text
