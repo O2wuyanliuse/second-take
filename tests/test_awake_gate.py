@@ -203,6 +203,19 @@ def test_handoff_deep_subdir_and_ancestor_walk_pinned_together():
     assert '这是续窗，按交接件的下一步直接做' in bullet
 
 
+def test_handoff_root_scattered_md_does_not_wake():
+    """C1 情形④：包根散放 root.md（不在三类目录）不醒，即使所在目录即工作区根。
+
+    「祖先＝cwd」只指三类目录顶层那种；散放包根的 .md 不在 scope，不算醒。
+    变异：去掉「包根下散放的 `.md`…不算醒」澄清句 → 本断言红。
+    """
+    bullet = next(l for l in AGENTS.splitlines()
+                  if '已存在的 `.md` 交接件路径' in l)
+    assert '包根下散放的 `.md`' in bullet
+    assert '不在上述三类目录内' in bullet
+    assert '三类目录顶层的 `.md`' in bullet
+
+
 def test_handoff_missing_and_external_paths_do_not_fake_wake():
     assert '这份文件没找到：<路径>' in AGENTS
     assert '路径不存在 → 只报' in AGENTS
