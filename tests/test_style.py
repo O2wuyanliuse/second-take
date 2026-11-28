@@ -140,21 +140,34 @@ def test_main_uses_tokenize_cache_and_marked_exemption(tmp_path, monkeypatch, ca
     """F1：走 main() 全流——每文件 tokenize 一次缓存，标 故意重复 的豁免、未标的报。
 
     钉主流程真用 tokenize 缓存：a.py 标记豁免、b.py 未标 → 只报 b.py 一条。
-    变异：main 不按文件缓存 comment_tokens／不认标记 → 报 2 条或 0 条，本断言红。
+    R2-4：monkeypatch generate_tokens 计数包装，断言调用次数 == 被扫 .py 文件数（本用例 2）。
+    变异：main 改回逐函数 tokenize（每函数重扫整文件）→ 调用次数 > 文件数，计数断言红；
+          或 main 不认标记 → 报 2 条，违规断言红。
     """
     tools_dir = tmp_path / "tools"
     tools_dir.mkdir()
     (tools_dir / "a.py").write_text(
-        "def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n", encoding="utf-8")
+        "def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n\n\n"
+        "def only_a():\n    return 1\n", encoding="utf-8")
     (tools_dir / "b.py").write_text(
-        "def run(items):\n    return sorted(items)\n", encoding="utf-8")
+        "def run(items):\n    return sorted(items)\n\n\n"
+        "def only_b():\n    return 2\n", encoding="utf-8")
     monkeypatch.setattr(style, "ROOT", tmp_path)
     monkeypatch.setattr(style, "_load_manifest", lambda: None)
+    calls = []
+    real_gt = style.tokenize.generate_tokens
+
+    def counting_gt(*a, **k):
+        calls.append(1)
+        return real_gt(*a, **k)
+
+    monkeypatch.setattr(style.tokenize, "generate_tokens", counting_gt)
     assert style.main() == 1
     out = capsys.readouterr().out
     assert "同名同体函数 run" in out
     assert "tools/b.py" in out
     assert "违规 1 条" in out
+    assert len(calls) == 2, f"每文件应只 tokenize 一次（2 文件），实得 {len(calls)} 次——缓存被改回逐函数重扫"
 
 
 def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
