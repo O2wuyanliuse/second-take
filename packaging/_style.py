@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """_style.py — 代码硬约束机查器（不进包）。
 
-查：单函数行数、模块 docstring 行数、裸 except Exception: pass、
+查：单函数行数、模块 docstring 行数、宽异常静默出口（具体异常另登记）、
 跨文件重复 helper（故意重复需标注）、打包计数 == 清单有效项。
 退出码：0 无违规 ／ 1 有违规。
 """
