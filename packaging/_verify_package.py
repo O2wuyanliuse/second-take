@@ -8,6 +8,7 @@
 """
 
 import hashlib
+import ntpath
 import os
 import re
 import shutil
@@ -621,7 +622,7 @@ def check_v12(root, fails, warns):
 def _parse_manifest(mf):
     """解析 MANIFEST.sha256 → (entries, bad_lines, bad_paths, n_lines)。
 
-    非法路径（绝对／含 ..）只记 bad_paths、不入 entries（R2-2，杜绝越界读包外）；
+    非法路径（盘符相对／绝对／含 ..）只记 bad_paths、不入 entries（R2-2/R2-5，杜绝越界读包外）；
     n_lines 计原始有效行数，供 R2-3 判重复 rel（dict 去重后 len(entries) 会吞重复）。
     """
     entries, bad_lines, bad_paths = {}, [], []
@@ -635,7 +636,7 @@ def _parse_manifest(mf):
                 bad_lines.append((i, line[:60]))
                 continue
             rel = parts[1].strip()
-            if os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
+            if ntpath.splitdrive(rel)[0] or os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
                 bad_paths.append((i, rel))
                 continue
             n_lines += 1

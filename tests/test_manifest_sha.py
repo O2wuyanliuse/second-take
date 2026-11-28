@@ -244,3 +244,73 @@ def test_check_v13_duplicate_rel_line_is_red(pkg):
     vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
     assert any("同一路径出现多次" in f for f in fails), fails
     assert not any("行数" in f for f in fails), fails
+
+
+def test_check_v13_drive_relative_path_is_red(pkg, monkeypatch):
+    """R2-5：盘符相对路径（isabs=False、不含 ..）→ ntpath.splitdrive 认出盘符，拒收、不读包外。
+
+    边界（人格 18:28 实测）：这条洞只在「包根所在盘 ≠ 清单路径前缀盘」时真正越界——
+    ntpath.join 遇异盘原样返回第二段，C:Windows\\win.ini 按 C: 当前目录解析；包根在 C: 时
+    join 拼成根内 Windows\\win.ini，读不到包外。故主钉子放 fails 文案「路径非法」，
+    spy open 没读包外那条当附加辅证（Windows 跨盘场景）、别当唯一断言。
+
+    变异：去掉 ntpath.splitdrive(rel)[0] 这一支 → 盘符路径入 entries，『路径非法』断言红。
+    """
+    bs = chr(92)
+    rel = "C:Windows" + bs + "win.ini"
+    mf = pkg / "MANIFEST.sha256"
+    digest = hashlib.sha256(b"drive-relative").hexdigest()
+    new, replaced = [], False
+    for ln in mf.read_text(encoding="utf-8").splitlines():
+        if not replaced and ln.strip() and not ln.startswith("#"):
+            new.append(digest + "  " + rel)
+            replaced = True
+        else:
+            new.append(ln)
+    mf.write_text("\n".join(new) + "\n", encoding="utf-8")
+    opened = []
+    real_open = builtins.open
+
+    def spy_open(file, *a, **k):
+        opened.append(os.path.abspath(os.fspath(file)))
+        return real_open(file, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", spy_open)
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("路径非法" in f for f in fails), fails
+    if os.name == "nt":
+        target = "C:" + bs + "Windows" + bs + "win.ini"
+        assert target not in opened, f"越界读了盘符相对路径：{opened}"
+
+
+def test_check_v13_absolute_path_is_red(pkg, monkeypatch):
+    """R2-5（审码登记第三条随本次补）：绝对路径独立用例 → isabs 支拒收、不读包外。
+
+    变异：去掉 ntpath.splitdrive 支时本用例仍绿（isabs 支还在）＝两支各自有牙。
+    """
+    outside = pkg.parent / "abs_outside.md"
+    outside.write_text("包外绝对路径内容", encoding="utf-8")
+    abs_rel = os.path.abspath(str(outside))
+    digest = hashlib.sha256(outside.read_bytes()).hexdigest()
+    mf = pkg / "MANIFEST.sha256"
+    new, replaced = [], False
+    for ln in mf.read_text(encoding="utf-8").splitlines():
+        if not replaced and ln.strip() and not ln.startswith("#"):
+            new.append(digest + "  " + abs_rel)
+            replaced = True
+        else:
+            new.append(ln)
+    mf.write_text("\n".join(new) + "\n", encoding="utf-8")
+    opened = []
+    real_open = builtins.open
+
+    def spy_open(file, *a, **k):
+        opened.append(os.path.abspath(os.fspath(file)))
+        return real_open(file, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", spy_open)
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("路径非法" in f for f in fails), fails
+    assert abs_rel not in opened, f"越界读了包外绝对路径：{opened}"
