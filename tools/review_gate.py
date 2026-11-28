@@ -298,7 +298,8 @@ def cmd_check(args):
     words = load_words(words_path)
     if words is None:
         print("[leak] 找不到词表：" + str(words_path)
-              + " —— 这一项没查（不算干净），但闸不因此放行任何东西。")
+              + " —— 这一项没查，不能算干净，本次不放行。")
+        return 1
     else:
         hits = scan_leaks(words)
         if hits is None:

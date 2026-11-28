@@ -360,3 +360,16 @@ def test_install_refuses_when_dotgit_is_a_file(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 1
     assert ".git 不是目录" in out
+
+
+def test_check_missing_words_fails_closed(sandbox, tmp_path, monkeypatch, capsys):
+    """R2：缺词表时 check 必须 fail-closed（rc1），报文不再自相矛盾。"""
+    mod = load(sandbox, tmp_path / "review", monkeypatch)
+    write(sandbox, "a.py", "print(1)\n")
+    head = commit(sandbox, "A")
+    receipt(tmp_path / "review", head)        # 有回执，排除「缺回执」干扰
+    rc = mod.main(["check"])                  # 沙箱里没有 .ci/denylist.txt
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "不能算干净，本次不放行" in out
+    assert "但闸不因此放行任何东西" not in out
