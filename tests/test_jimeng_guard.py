@@ -92,6 +92,11 @@ def post(port, body=b"{}", ctype="application/json", origin=None, length=None):
         conn.request("POST", "/api/generate", body=body, headers=headers)
         r = conn.getresponse()
         return r.status, r.read()
+    except Exception as e:
+        # 诊断底线（不 retry 掩盖）：摆出端口与异常原文，便于定位偶发。
+        # Windows 回环上服务端早拒（403/415/413）后按 HTTP/1.0 关连接，若请求体
+        # 未被读尽，关连接会触发 RST，客户端在 getresponse 处偶发 WinError 10053。
+        raise AssertionError(f"POST 127.0.0.1:{port} 失败：{type(e).__name__}: {e}") from e
     finally:
         conn.close()
 
@@ -119,26 +124,33 @@ def test_prompt_traversal_is_400():
         assert status == 400, "越界文件名必须 400，不能回 200 空清单"
     finally:
         httpd.shutdown()
+        httpd.server_close()
 
 
 def test_post_rejects_non_json_content_type():
     mod = load_server()
     httpd, port = serve(mod)
     try:
-        status, _ = post(port, b'{"dry_run": true}', ctype="text/plain")
+        # 空体：ctype 门在读体之前就拒（415），体内容与本断言无关。留实体会让
+        # 服务端早拒关连接时因「体未读尽」在 Windows 回环触发 RST（客户端偶发
+        # WinError 10053）；空体去掉这个 incidental 触发器，断言口径不变。
+        status, _ = post(port, b"", ctype="text/plain")
         assert status == 415, "text/plain 是免预检的简单请求，必须拒"
     finally:
         httpd.shutdown()
+        httpd.server_close()
 
 
 def test_post_rejects_cross_site_origin():
     mod = load_server()
     httpd, port = serve(mod)
     try:
-        status, _ = post(port, b'{"dry_run": true}', origin="https://evil.example")
+        # 空体同理：origin 门（403）也在读体之前拒，去掉未读尽体触发的回环 RST。
+        status, _ = post(port, b"", origin="https://evil.example")
         assert status == 403
     finally:
         httpd.shutdown()
+        httpd.server_close()
 
 
 def test_post_rejects_huge_body():
@@ -149,3 +161,4 @@ def test_post_rejects_huge_body():
         assert status == 413, "声明 2 MB 就该在 read 之前拒掉"
     finally:
         httpd.shutdown()
+        httpd.server_close()
