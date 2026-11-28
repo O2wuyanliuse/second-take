@@ -166,3 +166,26 @@ def test_prompt_last_line_explanation_consistent():
     assert '只少了末尾那行仍会醒' in prompt
     assert '「粘全了」的记号' not in prompt
     assert '末尾那行别删' not in prompt
+
+
+def test_existing_handoff_is_third_wake_entry():
+    assert '已存在的 `.md` 交接件路径** → 算醒' in AGENTS
+    assert '这是续窗，按交接件的下一步直接做' in AGENTS
+    assert '不再跑第 0.5 步' in AGENTS
+    assert '三条都不满足 → 没醒' in AGENTS
+
+
+def test_handoff_scope_covers_deep_package_paths_only():
+    for rel in ('00_原著/', 'Agent框架/', 'workspace/'):
+        assert '`%s`' % rel in AGENTS
+    assert '子目录任意深都算' in AGENTS
+    assert '从该 `.md` 所在目录起，逐级向父目录查到盘根' in AGENTS
+    assert '找到本包根的 `开工提示词.md` 才算本包' in AGENTS
+
+
+def test_handoff_missing_and_external_paths_do_not_fake_wake():
+    assert '这份文件没找到：<路径>' in AGENTS
+    assert '路径不存在 → 只报' in AGENTS
+    assert '本包外项目的 `.md` → 不算醒' in AGENTS
+    assert '不读那份文件' in AGENTS
+    assert AGENTS.count(SLEEP_LINE) == 1
