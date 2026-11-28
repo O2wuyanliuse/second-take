@@ -229,3 +229,18 @@ def test_check_v13_illegal_path_not_read_outside(pkg, monkeypatch):
     outside_abs = os.path.abspath(str(outside))
     assert outside_abs not in opened, f"越界读了包外文件：{opened}"
     assert any("路径非法" in f for f in fails), fails
+
+
+def test_check_v13_duplicate_rel_line_is_red(pkg):
+    """R2-3：复制一行（同 rel 两行）→ 报『同一路径出现多次』，而非行数不符。
+
+    变异：去掉 n_lines 判断 → 回落到行数文案（或绿），本断言红。
+    """
+    mf = pkg / "MANIFEST.sha256"
+    lines = mf.read_text(encoding="utf-8").splitlines()
+    data = [ln for ln in lines if ln.strip() and not ln.startswith("#")]
+    mf.write_text("\n".join(lines + [data[0]]) + "\n", encoding="utf-8")
+    fails, warns = [], []
+    vp.check_v13(str(pkg), fails, warns, _all_files(pkg))
+    assert any("同一路径出现多次" in f for f in fails), fails
+    assert not any("行数" in f for f in fails), fails

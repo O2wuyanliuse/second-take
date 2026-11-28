@@ -618,6 +618,31 @@ def check_v12(root, fails, warns):
 
     return fails, warns
 
+def _parse_manifest(mf):
+    """解析 MANIFEST.sha256 → (entries, bad_lines, bad_paths, n_lines)。
+
+    非法路径（绝对／含 ..）只记 bad_paths、不入 entries（R2-2，杜绝越界读包外）；
+    n_lines 计原始有效行数，供 R2-3 判重复 rel（dict 去重后 len(entries) 会吞重复）。
+    """
+    entries, bad_lines, bad_paths = {}, [], []
+    n_lines = 0
+    with open(mf, encoding="utf-8") as fh:
+        for i, line in enumerate(fh.read().splitlines(), 1):
+            if not line.strip() or line.startswith("#"):
+                continue
+            parts = line.split("  ", 1)
+            if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                bad_lines.append((i, line[:60]))
+                continue
+            rel = parts[1].strip()
+            if os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
+                bad_paths.append((i, rel))
+                continue
+            n_lines += 1
+            entries[rel] = parts[0].strip()
+    return entries, bad_lines, bad_paths, n_lines
+
+
 def check_v13(root, fails, warns, all_files):
     # ── V13 包内 MANIFEST.sha256 自洽（2026-11-28，ST1.0.9 A；R1 按包类型分流＋集合相等）──
     # 维护侧对打好的包（解压目录）跑：逐行核 sha256(包内该文件字节)==行值；核清单不含自身；
@@ -636,23 +661,7 @@ def check_v13(root, fails, warns, all_files):
         print("  ✗ 缺 MANIFEST.sha256 —— 包里没有自洽清单")
         fails.append("V13 缺 MANIFEST.sha256")
         return fails, warns
-    entries = {}
-    bad_lines = []
-    bad_paths = []
-    with open(mf, encoding="utf-8") as fh:
-        for i, line in enumerate(fh.read().splitlines(), 1):
-            if not line.strip() or line.startswith("#"):
-                continue
-            parts = line.split("  ", 1)
-            if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
-                bad_lines.append((i, line[:60]))
-                continue
-            rel = parts[1].strip()
-            # R2-2：非法路径（绝对／含 ..）先判后 continue——不入 entries、不进 sha 循环，杜绝越界读包外
-            if os.path.isabs(rel) or ".." in rel.replace("\\", "/").split("/"):
-                bad_paths.append((i, rel))
-                continue
-            entries[rel] = parts[0].strip()
+    entries, bad_lines, bad_paths, n_lines = _parse_manifest(mf)
     if "MANIFEST.sha256" in entries:
         print("  ✗ 清单含自身 MANIFEST.sha256 —— 清单不许列自己")
         fails.append("V13 清单含自身")
@@ -677,6 +686,10 @@ def check_v13(root, fails, warns, all_files):
     if len(entries) != n_files - 1:
         print("  ✗ 清单 %d 行 != 包内文件数 %d − 1" % (len(entries), n_files))
         fails.append("V13 清单行数 %d != 包内文件数 %d − 1" % (len(entries), n_files))
+    # R2-3：同 rel 多行被 dict 覆盖，len(entries) 只数去重键——另计原始有效行数，不等即报重复
+    if n_lines != len(entries):
+        print("  ✗ 清单同一路径出现多次（%d 行去重后 %d 项）" % (n_lines, len(entries)))
+        fails.append("V13 清单同一路径出现多次")
     mism = []
     for rel, want in entries.items():
         fp = os.path.join(root, rel.replace("/", os.sep))
@@ -694,7 +707,7 @@ def check_v13(root, fails, warns, all_files):
         for rel, why in mism[:20]:
             print("  ✗ %s —— %s" % (rel, why))
         fails.append("V13 %d 个文件 sha256 不符或缺失" % len(mism))
-    elif not bad_lines and not bad_paths and not missing and not extra and "MANIFEST.sha256" not in entries and len(entries) == n_files - 1:
+    elif not bad_lines and not bad_paths and not missing and not extra and "MANIFEST.sha256" not in entries and len(entries) == n_files - 1 and n_lines == len(entries):
         print("  ✅ %d 个文件 sha256 全核过，清单不含自身" % len(entries))
     return fails, warns
 
