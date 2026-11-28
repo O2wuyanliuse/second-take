@@ -183,6 +183,23 @@ def test_handoff_scope_covers_deep_package_paths_only():
     assert '找到本包根的 `开工提示词.md` 才算本包' in AGENTS
 
 
+def test_handoff_deep_subdir_and_ancestor_walk_pinned_together():
+    """R3：子目录任意深 ＋ 逐级向父查到盘根，同段钉住。
+
+    保护的场景：00_原著/子/深.md —— 落在 00_原著/ 下任意深，从它所在目录
+    逐级向父找，直到本包根的 开工提示词.md 才算本包。A1 是提示词行为，
+    这里只证字在；活体验收另走放行条，不拿文本断言冒充。
+    """
+    bullet = next(l for l in AGENTS.splitlines()
+                  if '已存在的 `.md` 交接件路径' in l)
+    assert '子目录任意深都算' in bullet, '深处规则不在第三醒法同段里'
+    assert '从该 `.md` 所在目录起，逐级向父目录查到盘根' in bullet, \
+        '祖先找根规则不在第三醒法同段里'
+    assert '找到本包根的 `开工提示词.md` 才算本包' in bullet
+    assert '`00_原著/`' in bullet, '00_原著/子/深.md 的第一段不在 scope，深处进不来'
+    assert '这是续窗，按交接件的下一步直接做' in bullet
+
+
 def test_handoff_missing_and_external_paths_do_not_fake_wake():
     assert '这份文件没找到：<路径>' in AGENTS
     assert '路径不存在 → 只报' in AGENTS
