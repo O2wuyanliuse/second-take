@@ -86,6 +86,8 @@ def _marked_duplicate(fn, text):
     for token in tokenize.generate_tokens(io.StringIO(text).readline):
         if token.type != tokenize.COMMENT or not fn.lineno <= token.start[0] < fn.lineno + 4:
             continue
+        if token.line[:token.start[1]].strip():
+            continue  # 行尾注释（前面有代码）不算标记，只认独占行
         comment = token.string.strip()
         if comment.startswith(prefix) and comment[len(prefix):].strip():
             marked = True

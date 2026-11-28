@@ -129,6 +129,25 @@ def test_duplicate_marker_must_be_a_comment_with_nonempty_reason():
     assert not marked("    '''\n    # 故意重复：docstring 不算\n    '''\n")
 
 
+def test_duplicate_marker_only_counts_exclusive_line():
+    def marked(source):
+        fn = ast.parse(source).body[0]
+        return style._marked_duplicate(fn, source)
+
+    assert marked("def run(items):\n    # 故意重复：模板需独立带走\n    return sorted(items)\n")
+    assert not marked("def run(items):\n    value = items  # 故意重复：行尾不算\n    return sorted(items)\n")
+    assert not marked("def run(items):  # 故意重复：def行尾不算\n    return sorted(items)\n")
+
+
+def test_trailing_comment_marker_does_not_exempt_duplicate():
+    issues = duplicates(
+        ("tools/a.py", "def run(items):\n    return sorted(items)  # 故意重复：行尾不算\n"),
+        ("tools/b.py", "def run(items):\n    return sorted(items)\n"),
+    )
+    assert len(issues) == 2
+    assert all("同名同体函数 run" in issue for issue in issues)
+
+
 def test_duplicate_marker_tokenize_failure_is_red(tmp_path, monkeypatch, capsys):
     source_dir = tmp_path / "tools"
     source_dir.mkdir()
