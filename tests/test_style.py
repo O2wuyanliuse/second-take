@@ -88,6 +88,25 @@ def test_length_exemption_long_fence_not_closed_by_shorter_run(tmp_path, monkeyp
     assert style._length_exemptions() == {("tools/outside.py", "run")}
 
 
+def test_length_exemption_short_fence_closed_by_longer_run(tmp_path, monkeypatch):
+    """B1：三反引号开、四反引号闭——闭合需 leading 串 ≥ 开长度，四 ≥ 三 → 闭合，块外豁免生效。
+
+    与 test_length_exemption_long_fence_not_closed_by_shorter_run（四开三不闭）互为双向钉子。
+    变异：把闭合条件 run_len >= fence[1] 改成 == → 四不等于三不闭合，块外豁免丢失，本断言红。
+    """
+    baseline = tmp_path / "docs" / "maintain" / "_style基线.md"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text(
+        "```\n"
+        "tools/inside.py:run — 三反引号块内不生效\n"
+        "````\n"
+        "tools/outside.py:run — 四反引号闭合（≥三）后块外正常豁免\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(style, "ROOT", tmp_path)
+    assert style._length_exemptions() == {("tools/outside.py", "run")}
+
+
 def test_length_exemption_uses_qualified_name_for_nested_functions():
     source = (
         "def outer():\n"
