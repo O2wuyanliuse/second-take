@@ -380,7 +380,12 @@ def cmd_install(args):
     if not source.is_file():
         print("[失败] 找不到闸逻辑：" + str(source))
         return 1
-    gate = repo / ".git" / "gate"
+    dotgit = repo / ".git"
+    if dotgit.exists() and not dotgit.is_dir():
+        print("[失败] .git 不是目录（worktree/submodule 的 .git 是文件）：" + str(dotgit)
+              + " —— 本闸只支持普通仓库，装不上。")
+        return 1
+    gate = dotgit / "gate"
     gate.mkdir(parents=True, exist_ok=True)
     for name, body in (("review_gate.py", FORWARDER), ("pre-push", PRE_PUSH)):
         path = gate / name

@@ -347,3 +347,16 @@ def test_prepush_shell_reports_when_no_usable_python(sandbox, tmp_path, monkeypa
     assert "[blocked] 找不到能用的 python" in both
     assert "试过" in both and "python3" in both
     assert "SECOND_TAKE_PYTHON" in both
+
+
+def test_install_refuses_when_dotgit_is_a_file(tmp_path, monkeypatch, capsys):
+    """R1b：worktree/submodule 的 .git 是文件，install 要明确报错而不是炸栈。"""
+    repo = tmp_path / "wt"
+    (repo / "tools").mkdir(parents=True)
+    (repo / "tools" / "review_gate.py").write_text("# gate\n", encoding="utf-8")
+    (repo / ".git").write_text("gitdir: ../real/.git/worktrees/wt\n", encoding="utf-8")
+    mod = load(repo, tmp_path / "review", monkeypatch)
+    rc = mod.main(["install", "--repo", str(repo)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert ".git 不是目录" in out
