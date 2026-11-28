@@ -10,6 +10,11 @@
 import importlib.util
 import io
 import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 from helpers import REPO, commit, write
@@ -145,7 +150,7 @@ def test_prepush_empty_stdin_is_red(sandbox, tmp_path, monkeypatch, capsys):
     assert "没收到推送清单（stdin 空），封条核不了 refs" in capsys.readouterr().out
 
 
-def test_install_refreshes_copy_and_backs_up_old_hook(
+def test_install_refreshes_forwarders_and_backs_up_old_hooks(
         sandbox, tmp_path, monkeypatch):
     mod = load(sandbox, tmp_path / "review", monkeypatch)
     write(sandbox, "tools/review_gate.py", "# refreshed gate\n")
@@ -156,10 +161,98 @@ def test_install_refreshes_copy_and_backs_up_old_hook(
     rc = mod.main(["install", "--repo", str(sandbox)])
     assert rc == 0
     gate = sandbox / ".git" / "gate"
-    assert (gate / "review_gate.py").read_text(encoding="utf-8") == "# refreshed gate\n"
-    backups = list(gate.glob("pre-push.bak-*"))
-    assert len(backups) == 1
-    assert backups[0].read_text(encoding="utf-8") == "#!/bin/sh\n# old hook\n"
+    forwarder = (gate / "review_gate.py").read_text(encoding="utf-8")
+    assert "为什么这里只留转发、不留第二份完整拷贝：两份迟早不同步" in forwarder
+    assert 'sys.path.insert(0, str(repo / "tools"))' in forwarder
+    assert "import review_gate" in forwarder
+    assert "sys.exit(review_gate.main(sys.argv[1:]))" in forwarder
+    assert "# refreshed gate" not in forwarder
+    for name, old in (("pre-push", "# old hook"), ("review_gate.py", "# stale gate")):
+        backups = list(gate.glob(name + ".bak-*"))
+        assert len(backups) == 1
+        assert old in backups[0].read_text(encoding="utf-8")
     hook = (gate / "pre-push").read_text(encoding="utf-8")
-    assert 'cd "$(git rev-parse --git-path gate)"' in hook
-    assert 'python review_gate.py pre-push "$@"' in hook
+    assert 'root="$(git rev-parse --show-toplevel)" || exit 1' in hook
+    assert "SECOND_TAKE_PYTHON" in hook
+    assert "find_py" in hook
+    assert "[blocked] 找不到词表" in hook
+    assert 'exec "$PY" -X utf8 "$root/.git/gate/review_gate.py" pre-push "$@"' in hook
+
+
+def _install_real_gate(sandbox, review_dir, monkeypatch):
+    """装真逻辑；只把封条下游换成能报告收到 refs 的探针。"""
+    mod = load(sandbox, review_dir, monkeypatch)
+    write(sandbox, "tools/review_gate.py",
+          (REPO / "tools" / "review_gate.py").read_text(encoding="utf-8"))
+    write(sandbox, "tools/verify_release.py",
+          "import sys\n"
+          "for line in sys.stdin.read().splitlines():\n"
+          "    print('[seal] 逐 ref 核验通过：' + line.split()[0])\n")
+    write(sandbox, "a.py", "print(1)\n")
+    head = commit(sandbox, "A")
+    receipt(review_dir, head)
+    write(sandbox, ".ci/denylist.txt", "private-token-not-present\n")
+    assert mod.main(["install", "--repo", str(sandbox)]) == 0
+    return head
+
+
+def _git_sh():
+    shell = shutil.which("sh")
+    if shell:
+        return shell
+    git = shutil.which("git")
+    if not git:
+        raise AssertionError("本机没有 git，无法验 sh 推送壳")
+    git_path = Path(git).resolve()
+    candidates = [
+        git_path.with_name("sh.exe"),
+        git_path.parent.parent / "bin" / "sh.exe",
+        git_path.parent.parent / "usr" / "bin" / "sh.exe",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    raise AssertionError("本机没有 Git sh，无法验 sh 推送壳")
+
+
+def test_installed_forwarder_check_uses_repo_words_not_git_words(
+        sandbox, tmp_path, monkeypatch):
+    review_dir = tmp_path / "review"
+    _install_real_gate(sandbox, review_dir, monkeypatch)
+    monkeypatch.delenv("SECOND_TAKE_REPO", raising=False)
+    monkeypatch.delenv("SECOND_TAKE_WORDS", raising=False)
+    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
+    gate = sandbox / ".git" / "gate"
+    result = subprocess.run(
+        [sys.executable, str(gate / "review_gate.py"), "check"],
+        cwd=gate, capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[leak] 待推内容干净" in result.stdout
+    assert "找不到词表" not in result.stdout
+    assert ".git\\.ci" not in result.stdout
+
+
+def test_installed_sh_hook_routes_stdin_through_all_gates(
+        sandbox, tmp_path, monkeypatch):
+    review_dir = tmp_path / "review"
+    head = _install_real_gate(sandbox, review_dir, monkeypatch)
+    home = tmp_path / "home"
+    write(home, ".second-take/checks/sec_surface.py",
+          "for n in range(1, 5):\n"
+          "    print('[sec] door %s 绿' % n)\n")
+    monkeypatch.delenv("SECOND_TAKE_REPO", raising=False)
+    monkeypatch.setenv("SECOND_TAKE_PYTHON", sys.executable)
+    monkeypatch.setenv("SECOND_TAKE_WORDS", str(sandbox / ".ci" / "denylist.txt"))
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
+    refs = "refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40)
+    result = subprocess.run(
+        [_git_sh(), ".git/gate/pre-push", "origin", "https://example.invalid/repo.git"],
+        cwd=sandbox, input=refs, capture_output=True, text=True, encoding="utf-8",
+        env=os.environ.copy())
+    assert result.returncode == 0, result.stdout + result.stderr
+    for n in range(1, 5):
+        assert "[sec] door %s 绿" % n in result.stdout
+    assert "[seal] 逐 ref 核验通过：refs/heads/main" in result.stdout
+    assert "can't open file" not in result.stderr

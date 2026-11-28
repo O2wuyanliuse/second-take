@@ -33,6 +33,75 @@ ROOT = Path(os.environ.get("SECOND_TAKE_REPO") or
 # 多加一个等于把「内容」也塞进免签白名单——小渊 2026-11-24 明确不许。
 VERSION_FILES = ("VERSION", "latest.json")
 
+FORWARDER = r'''#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""本地闸的入口（这一层不进仓库）。
+
+真正的逻辑在 `tools/review_gate.py`——放进仓库是为了让用例测得到它；
+回执仍然留在 `~/.second-take/review/`，不进仓库、不进包。
+
+为什么这里只留转发、不留第二份完整拷贝：两份迟早不同步，
+那时候「测过的」和「跑着的」就是两个东西了。
+"""
+
+import pathlib
+import sys
+
+repo = pathlib.Path(__file__).resolve().parents[2]      # .git/gate/x.py → 仓库根
+sys.path.insert(0, str(repo / "tools"))
+
+import review_gate  # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(review_gate.main(sys.argv[1:]))
+'''
+
+PRE_PUSH = r'''#!/bin/sh
+# second-take 推送前强制核验：解释器与依赖缺失都必须硬拦。
+set -u
+
+root="$(git rev-parse --show-toplevel)" || exit 1
+cd "$root" || exit 1
+
+find_py() {
+  if [ -n "${SECOND_TAKE_PYTHON:-}" ] && [ -x "${SECOND_TAKE_PYTHON}" ]; then
+    echo "${SECOND_TAKE_PYTHON}"; return 0
+  fi
+  if [ -f .git/second-take-python ]; then
+    p=$(cat .git/second-take-python 2>/dev/null)
+    if [ -n "$p" ] && [ -x "$p" ]; then echo "$p"; return 0; fi
+  fi
+  for c in python3 python py; do
+    if command -v "$c" >/dev/null 2>&1; then echo "$c"; return 0; fi
+  done
+  echo ""
+}
+
+PY=$(find_py)
+if [ -z "$PY" ]; then
+  echo "[blocked] 找不到 python，无法核验 → 拒绝推送。"
+  echo "  装 python，或把解释器路径写进 .git/second-take-python（或设 SECOND_TAKE_PYTHON）。"
+  exit 1
+fi
+
+TOOL="tools/verify_release.py"
+if [ ! -f "$TOOL" ]; then
+  echo "[blocked] 缺少 $TOOL，无法核验 → 拒绝推送。"
+  echo "  这不是「跳过」，是配置坏了：删掉脚本不能成为绕过方式。"
+  exit 1
+fi
+
+WORDS="${SECOND_TAKE_WORDS:-.ci/denylist.txt}"
+if [ ! -s "$WORDS" ]; then
+  echo "[blocked] 找不到词表：$WORDS"
+  echo "  设 SECOND_TAKE_WORDS=<私库词表>，或把它放到 .ci/denylist.txt（已 gitignore）。"
+  echo "  没有词表就核不了——核不了不许推。"
+  exit 1
+fi
+
+exec "$PY" -X utf8 "$root/.git/gate/review_gate.py" pre-push "$@"
+'''
+
 
 def receipt_dir():
     env = os.environ.get("SECOND_TAKE_REVIEW_DIR")
@@ -272,8 +341,22 @@ def cmd_prepush(args):
     return r.returncode
 
 
+def _backup_file(path):
+    """旧壳按名字留时间戳备份；不存在时不造空备份。"""
+    if not path.is_file():
+        return None
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = path.with_name(path.name + ".bak-" + stamp)
+    n = 1
+    while backup.exists():
+        backup = path.with_name(path.name + ".bak-" + stamp + "-" + str(n))
+        n += 1
+    shutil.copy2(path, backup)
+    return backup
+
+
 def cmd_install(args):
-    """刷新本机闸副本与 pre-push 壳；旧壳先留时间戳备份。"""
+    """只刷新转发壳与 pre-push；逻辑始终留在仓库 tools/。"""
     repo = Path(args.repo).resolve() if args.repo else ROOT
     source = repo / "tools" / "review_gate.py"
     if not source.is_file():
@@ -281,27 +364,18 @@ def cmd_install(args):
         return 1
     gate = repo / ".git" / "gate"
     gate.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, gate / "review_gate.py")
-    hook = gate / "pre-push"
-    if hook.is_file():
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = gate / ("pre-push.bak-" + stamp)
-        n = 1
-        while backup.exists():
-            backup = gate / ("pre-push.bak-" + stamp + "-" + str(n))
-            n += 1
-        shutil.copy2(hook, backup)
-        print("[备份] 旧 pre-push → " + backup.name)
-    hook.write_text(
-        "#!/bin/sh\n"
-        "cd \"$(git rev-parse --git-path gate)\" && "
-        "python review_gate.py pre-push \"$@\"\n",
-        encoding="utf-8", newline="\n")
+    for name, body in (("review_gate.py", FORWARDER), ("pre-push", PRE_PUSH)):
+        path = gate / name
+        backup = _backup_file(path)
+        if backup:
+            print("[备份] 旧 " + name + " → " + backup.name)
+        path.write_text(body, encoding="utf-8", newline="\n")
+        path.chmod(0o755)
     r = sh("git", "config", "core.hooksPath", ".git/gate", cwd=repo)
     if r.returncode != 0:
         print("[失败] 设不上 core.hooksPath：" + r.stderr.strip()[:160])
         return 1
-    print("[ok] 闸副本与 pre-push 已刷新；core.hooksPath = .git/gate（" + str(repo) + "）")
+    print("[ok] 闸转发壳与 pre-push 已刷新；core.hooksPath = .git/gate（" + str(repo) + "）")
     return 0
 
 
