@@ -136,18 +136,80 @@ def test_prepush_forwards_the_same_stdin_to_seal(sandbox, tmp_path, monkeypatch)
     assert kwargs["input"] == refs
 
 
-def test_prepush_empty_stdin_is_red(sandbox, tmp_path, monkeypatch, capsys):
+def _prepush_stage(sandbox, tmp_path, monkeypatch, with_receipt):
+    """真 cmd_check 的舞台：仓库、词表、（可选）回执、空 home（sec 面不在）。"""
     mod = load(sandbox, tmp_path / "review", monkeypatch)
+    write(sandbox, "a.py", "print(1)\n")
+    head = commit(sandbox, "A")
+    write(sandbox, ".ci/denylist.txt", "private-token-not-present\n")
+    if with_receipt:
+        receipt(tmp_path / "review", head)
+    home = tmp_path / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    return mod, head
+
+
+def test_prepush_empty_stdin_without_receipt_reports_both(
+        sandbox, tmp_path, monkeypatch, capsys):
+    """R2：空 stdin ＋ 无回执 → 两句都在，不被回执缺失误挡。"""
+    mod, _ = _prepush_stage(sandbox, tmp_path, monkeypatch, with_receipt=False)
     monkeypatch.setattr(mod.sys, "stdin", io.StringIO("\n"))
-    monkeypatch.setattr(mod, "cmd_check", lambda args: 0)
+    real_run = subprocess.run
 
-    def must_not_run(*args, **kwargs):
-        raise AssertionError("空 refs 不能交给下游假装核过")
+    def no_seal(cmd, **kwargs):
+        assert "verify_release.py" not in " ".join(map(str, cmd)), \
+            "空 refs 不能交给下游假装核过"
+        return real_run(cmd, **kwargs)
 
-    monkeypatch.setattr(mod.subprocess, "run", must_not_run)
+    monkeypatch.setattr(mod.subprocess, "run", no_seal)
     rc = mod.main(["pre-push"])
+    out = capsys.readouterr().out
     assert rc == 1
-    assert "没收到推送清单（stdin 空），封条核不了 refs" in capsys.readouterr().out
+    assert "没收到推送清单（stdin 空），封条核不了 refs" in out
+    assert "还没有复核回执" in out
+
+
+def test_prepush_empty_stdin_with_receipt_reports_only_stdin(
+        sandbox, tmp_path, monkeypatch, capsys):
+    """R2：空 stdin ＋ 有回执 → 只报 stdin 句，不再误报缺回执。"""
+    mod, _ = _prepush_stage(sandbox, tmp_path, monkeypatch, with_receipt=True)
+    monkeypatch.setattr(mod.sys, "stdin", io.StringIO("\n"))
+    real_run = subprocess.run
+
+    def no_seal(cmd, **kwargs):
+        assert "verify_release.py" not in " ".join(map(str, cmd)), \
+            "空 refs 不能交给下游假装核过"
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(mod.subprocess, "run", no_seal)
+    rc = mod.main(["pre-push"])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "没收到推送清单（stdin 空），封条核不了 refs" in out
+    assert "还没有复核回执" not in out
+
+
+def test_prepush_normal_stdin_with_receipt_passes(sandbox, tmp_path, monkeypatch):
+    """R2：正常 refs ＋ 有回执 → rc0，完整清单原样交给封条下游。"""
+    mod, head = _prepush_stage(sandbox, tmp_path, monkeypatch, with_receipt=True)
+    refs = "refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40)
+    monkeypatch.setattr(mod.sys, "stdin", io.StringIO(refs))
+    real_run = subprocess.run
+    calls = []
+
+    def fake_seal(cmd, **kwargs):
+        if "verify_release.py" in " ".join(map(str, cmd)):
+            calls.append((cmd, kwargs))
+            return SimpleNamespace(returncode=0)
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_seal)
+    rc = mod.main(["pre-push"])
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0][1]["input"] == refs
 
 
 def test_install_refreshes_forwarders_and_backs_up_old_hooks(

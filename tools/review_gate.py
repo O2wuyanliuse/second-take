@@ -324,13 +324,13 @@ def _run_security_surface():
 def cmd_prepush(args):
     """stdin 只取一次；同一份推送清单交给逐 ref 封条核验。"""
     refs_text = sys.stdin.read()
+    empty = not refs_text.strip()
     args.words = (args.words or os.environ.get("SECOND_TAKE_WORDS")
                   or str(ROOT / ".ci" / "denylist.txt"))
     rc = cmd_check(args)
-    if rc:
-        return rc
-    if not refs_text.strip():
+    if empty:
         print("[停一下] 没收到推送清单（stdin 空），封条核不了 refs")
+    if empty or rc:
         return 1
     if _run_security_surface():
         return 1
