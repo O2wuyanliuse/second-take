@@ -38,24 +38,42 @@ def _length_exemptions():
     if not path.exists():
         return set()
     exemptions = set()
+    fence = None
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw.strip()
-        if not line or line.startswith(("#", "`")):
+        marker = line[:3]
+        if marker in ("```", "~~~"):
+            if fence is None:
+                fence = marker
+            elif fence == marker:
+                fence = None
+            continue
+        if fence or not line or line.startswith(("#", "`")):
             continue
         location, sep, reason = line.partition(" — ")
         if not sep or not reason.strip() or ":" not in location:
             continue
         rel, name = location.rsplit(":", 1)
-        if rel.endswith(".py") and name.isidentifier():
+        if rel.endswith(".py") and all(part.isidentifier() for part in name.split(".")):
             exemptions.add((rel, name))
     return exemptions
 
 
-def _length_issue(rel, fn, exemptions):
+def _qualified_name(fn, parents):
+    names = [fn.name]
+    parent = parents.get(fn)
+    while isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        names.append(parent.name)
+        parent = parents.get(parent)
+    return ".".join(reversed(names))
+
+
+def _length_issue(rel, fn, exemptions, name=None):
+    name = name or fn.name
     n = _fn_len(fn)
-    if n <= 80 or (rel, fn.name) in exemptions:
+    if n <= 80 or (rel, name) in exemptions:
         return None
-    return f"{rel}:{fn.lineno}: {fn.name} {n} 行 > 80"
+    return f"{rel}:{fn.lineno}: {name} {n} 行 > 80"
 
 
 def _marked_duplicate(fn, text):
@@ -182,12 +200,13 @@ def main():
         except SyntaxError as e:
             issues.append(f"{rel}: 语法错误 {e}")
             continue
+        parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
         d = _docstring_lines(tree)
         if d > 15:
             issues.append(f"{rel}: 模块 docstring {d} 行 > 15")
         for fn in ast.walk(tree):
             if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                issue = _length_issue(rel, fn, exemptions)
+                issue = _length_issue(rel, fn, exemptions, _qualified_name(fn, parents))
                 if issue:
                     issues.append(issue)
                 if not fn.name.startswith("test") and fn.name != "__init__":

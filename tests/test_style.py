@@ -58,11 +58,36 @@ def test_length_exemptions_require_exact_path_function_and_reason(tmp_path, monk
         "tools/b.py:run —   \n"
         "# tools/c.py:run — 注释不算\n"
         "tools/d.py:not-a-name — 函数名无效\n"
-        "tools/e.py:run — 已登记的历史原因\n",
+        "```\n"
+        "tools/fenced.py:run — 围栏示例不算\n"
+        "```\n"
+        "~~~\n"
+        "tools/tilde.py:run — 波浪围栏示例不算\n"
+        "~~~\n"
+        "tools/e.py:Outer.run — 已登记的历史原因\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(style, "ROOT", tmp_path)
-    assert style._length_exemptions() == {("tools/e.py", "run")}
+    assert style._length_exemptions() == {("tools/e.py", "Outer.run")}
+
+
+def test_length_exemption_uses_qualified_name_for_nested_functions():
+    source = (
+        "def outer():\n"
+        "    def inner():\n" + "        value = 0\n" * 80
+        + "    def other():\n" + "        value = 0\n" * 80
+    )
+    tree = ast.parse(source)
+    parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+    functions = {fn.name: fn for fn in ast.walk(tree) if isinstance(fn, ast.FunctionDef)}
+    exemptions = {("tools/a.py", "outer.inner")}
+    inner = functions["inner"]
+    other = functions["other"]
+    inner_name = style._qualified_name(inner, parents)
+    other_name = style._qualified_name(other, parents)
+    assert inner_name == "outer.inner"
+    assert style._length_issue("tools/a.py", inner, exemptions, inner_name) is None
+    assert "outer.other 81 行 > 80" in style._length_issue("tools/a.py", other, exemptions, other_name)
 
 
 def test_marked_template_copy_only_exempts_itself():
