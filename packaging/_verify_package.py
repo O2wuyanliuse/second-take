@@ -4,9 +4,10 @@
 
 用法：python packaging/_verify_package.py <包目录>
 退出码：0 全过 ／ 1 有阻断 ／ 2 只有提示。
-十三项详见 docs/maintain/验包十三项.md。
+验包项详见 docs/maintain/验包十三项.md（文件名沿用，现十四项）。
 """
 
+import hashlib
 import os
 import re
 import shutil
@@ -617,6 +618,57 @@ def check_v12(root, fails, warns):
 
     return fails, warns
 
+def check_v13(root, fails, warns, all_files):
+    # ── V13 包内 MANIFEST.sha256 自洽（2026-11-28，ST1.0.9 A）──
+    # 维护侧对打好的包（解压目录）跑：逐行核 sha256(包内该文件字节)==行值；
+    # 核清单不含自身；行数==包内文件数−1。缺清单／行不符→阻断。
+    # 包里只放 MANIFEST.sha256 本身，本检查在维护侧（packaging/ 不进用户包）。
+    print("\nV13 包内 MANIFEST.sha256 自洽")
+    mf = os.path.join(root, "MANIFEST.sha256")
+    if not os.path.isfile(mf):
+        print("  ✗ 缺 MANIFEST.sha256 —— 包里没有自洽清单")
+        fails.append("V13 缺 MANIFEST.sha256")
+        return fails, warns
+    entries = {}
+    bad_lines = []
+    with open(mf, encoding="utf-8") as fh:
+        for i, line in enumerate(fh.read().splitlines(), 1):
+            if not line.strip() or line.startswith("#"):
+                continue
+            parts = line.split("  ", 1)
+            if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                bad_lines.append((i, line[:60]))
+                continue
+            entries[parts[1].strip()] = parts[0].strip()
+    if "MANIFEST.sha256" in entries:
+        print("  ✗ 清单含自身 MANIFEST.sha256 —— 清单不许列自己")
+        fails.append("V13 清单含自身")
+    n_files = len(all_files)
+    if len(entries) != n_files - 1:
+        print("  ✗ 清单 %d 行 != 包内文件数 %d − 1" % (len(entries), n_files))
+        fails.append("V13 清单行数 %d != 包内文件数 %d − 1" % (len(entries), n_files))
+    mism = []
+    for rel, want in entries.items():
+        fp = os.path.join(root, rel.replace("/", os.sep))
+        if not os.path.isfile(fp):
+            mism.append((rel, "文件不在"))
+            continue
+        with open(fp, "rb") as fb:
+            got = hashlib.sha256(fb.read()).hexdigest()
+        if got != want:
+            mism.append((rel, "sha256 不符"))
+    for i, snip in bad_lines:
+        print("  ✗ 第 %d 行格式不对：%s" % (i, snip))
+        fails.append("V13 清单第 %d 行格式不对" % i)
+    if mism:
+        for rel, why in mism[:20]:
+            print("  ✗ %s —— %s" % (rel, why))
+        fails.append("V13 %d 个文件 sha256 不符或缺失" % len(mism))
+    elif not bad_lines and "MANIFEST.sha256" not in entries and len(entries) == n_files - 1:
+        print("  ✅ %d 个文件 sha256 全核过，清单不含自身" % len(entries))
+    return fails, warns
+
+
 def main():
     if len(sys.argv) < 2:
         print("用法：python packaging/_verify_package.py <包目录>")
@@ -648,6 +700,7 @@ def main():
     check_v9(root, fails, warns, all_files)
     for fn in (check_v10, check_v11, check_v12):
         fn(root, fails, warns)
+    check_v13(root, fails, warns, all_files)
     # ── 汇总 ──
     print()
     if fails:

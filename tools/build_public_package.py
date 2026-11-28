@@ -8,6 +8,7 @@
 扫不过时本脚本会**删掉刚打出来的 zip**，让它物理上不存在——不是「报个红请你记得别传」。
 """
 import argparse
+import hashlib
 import os
 import re
 import subprocess
@@ -67,6 +68,15 @@ def tracked(git, repo):
     return [l for l in p.stdout.decode("utf-8", "replace").splitlines() if l.strip()]
 
 
+def _manifest_sha_text(repo, files):
+    """包内自洽清单文本：头行声明不含自身，每行 '<sha256>  <相对路径>'。"""
+    lines = ["# 本清单不含自身"]
+    for f in files:
+        digest = hashlib.sha256((repo / f).read_bytes()).hexdigest()
+        lines.append(digest + "  " + f.replace(os.sep, "/"))
+    return "\n".join(lines) + "\n"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default=os.environ.get("SECOND_TAKE_REPO", "D:/dev/second-take"))
@@ -117,18 +127,20 @@ def main():
             if not src.exists():
                 raise SystemExit("白名单里的文件在盘上不存在：" + f)
             z.write(src, prefix + "/" + f.replace(os.sep, "/"))
+        # A（ST1.0.9）：包内自洽清单 MANIFEST.sha256，逐文件 sha256，不含自身。
+        z.writestr(prefix + "/MANIFEST.sha256", _manifest_sha_text(repo, files))
 
     size = out.stat().st_size
     sha = sha256_of(out)
-    print("打包  " + str(len(files)) + " 个文件 · " + str(size) + " B")
+    print("打包  " + str(len(files) + 1) + " 个文件 · " + str(size) + " B")
     print("路径  " + str(out))
     print("sha256  " + sha)
 
     if a.words:
         words = parse_words(Path(a.words).read_text(encoding="utf-8", errors="replace"))
         n, hits, has_deny, susp = scan_zip(out, words)
-        if n != len(files):
-            print("包内文件数 " + str(n) + " ≠ 打包清单 " + str(len(files)))
+        if n != len(files) + 1:
+            print("包内文件数 " + str(n) + " ≠ 打包清单 " + str(len(files) + 1))
         bad = bool(hits) or has_deny or bool(susp)
         if bad:
             for fn, ln, text in hits[:10]:

@@ -13,6 +13,8 @@
 #   packaging/ 19 项（含 templates 下 7 份空模板）
 #   tests/ 11 项（检查器自己的用例）
 #   发版链 6 支工具：build_public_package.py、check_bilingual.py、check_maintenance.py、release.py、seal.py、verify_release.py
+# MANIFEST.sha256 由 build_public_package.py 生成进包（非 git 跟踪）；列在此使清单有效项含它。
+MANIFEST.sha256
 .gitattributes
 .gitignore
 links_scope.json

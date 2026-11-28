@@ -39,7 +39,7 @@ def test_package_builder_failure_is_red(monkeypatch):
         subprocess, "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr="boom"),
     )
-    issue = style._check_package_count(ROOT, 112)
+    issue = style._check_package_count(ROOT, 113)
     assert "打包失败" in issue
     assert "boom" in issue
 
@@ -52,7 +52,7 @@ def test_package_builder_timeout_is_red(monkeypatch):
         raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout"))
 
     monkeypatch.setattr(subprocess, "run", slow_pack)
-    issue = style._check_package_count(ROOT, 112)
+    issue = style._check_package_count(ROOT, 113)
     assert seen["timeout"] == 120
     assert "打包失败" in issue
     assert "TimeoutExpired" in issue
